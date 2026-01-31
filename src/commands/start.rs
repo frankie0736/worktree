@@ -69,25 +69,24 @@ pub fn execute(name: String) -> Result<()> {
         })?;
     }
 
-    // Build agent command with inline prompt
-    let prompt = format!(
-        "@{}/\n\n请完成任务: {}\n\n任务描述已在上方文件中。",
-        TASKS_DIR, name
-    );
+    // Build agent command by replacing template variables
+    let task_file = format!("{}/{}.md", TASKS_DIR, name);
+    let expanded_cmd = config
+        .agent_command
+        .replace("{name}", &name)
+        .replace("{tasks_dir}", TASKS_DIR)
+        .replace("{task_file}", &task_file);
 
     // Build command with optional tee for logging
     // If agent supports --output-format=stream-json, tee the output to log file
     // Use absolute path since tmux window cwd is the worktree, not main project
     let log_file = cwd.join(log_path(&name)).to_string_lossy().to_string();
-    let agent_cmd = if config.agent_command.contains("--output-format=stream-json")
-        || config.agent_command.contains("--output-format stream-json")
+    let agent_cmd = if expanded_cmd.contains("--output-format=stream-json")
+        || expanded_cmd.contains("--output-format stream-json")
     {
-        format!(
-            "{} \"{}\" 2>&1 | tee -a {}",
-            config.agent_command, prompt, log_file
-        )
+        format!("{} 2>&1 | tee -a {}", expanded_cmd, log_file)
     } else {
-        format!("{} \"{}\"", config.agent_command, prompt)
+        expanded_cmd
     };
 
     tmux::create_window(&config.tmux_session, &name, &worktree_path, &agent_cmd)?;

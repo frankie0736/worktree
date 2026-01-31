@@ -25,8 +25,12 @@ fn generate_config(project_name: &str) -> String {
         r#"# wt configuration
 # See: https://github.com/anthropics/wt
 
-# Agent command (uses @file syntax to read prompt)
-agent_command: claude --verbose --output-format=stream-json --input-format=stream-json -p
+# Agent command template
+# Available variables:
+#   {{name}}      - task name (e.g., "auth-module")
+#   {{task_file}} - task file path (e.g., ".wt/tasks/auth-module.md")
+#   {{tasks_dir}} - tasks directory (".wt/tasks")
+agent_command: claude --verbose --output-format=stream-json --input-format=stream-json -p "@{{task_file}} 请完成这个任务"
 
 # Tmux session name (unique per project to avoid conflicts)
 tmux_session: {}
