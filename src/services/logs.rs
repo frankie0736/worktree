@@ -49,7 +49,6 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
     let mut last_input: u64 = 0;
     let mut total_output: u64 = 0;
     let mut turn_count: u32 = 0;
-    let mut has_result = false;
 
     for line in reader.lines() {
         let line = line.ok()?;
@@ -75,22 +74,18 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
                     }
                 }
                 LogEntry::Result(result) => {
-                    has_result = true;
                     metrics.num_turns = result.num_turns.unwrap_or(turn_count);
                     if let Some(model_usage) = result.model_usage {
                         for (_, usage) in model_usage {
+                            // Only get context_window from result
+                            // Do NOT overwrite last_cache_read/last_input - those are cumulative in result
+                            // We want the last assistant message's values for context calculation
                             if let Some(cw) = usage.context_window {
                                 metrics.context_window = cw;
                             }
-                            // For completed tasks, use final totals
-                            if let Some(input) = usage.input_tokens {
-                                last_input = input;
-                            }
+                            // Use cumulative output from result for total output
                             if let Some(output) = usage.output_tokens {
                                 total_output = output;
-                            }
-                            if let Some(cache_read) = usage.cache_read_input_tokens {
-                                last_cache_read = cache_read;
                             }
                         }
                     }
@@ -101,18 +96,9 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
     }
 
     // Current context = cache_read (history) + input (new tokens)
-    // For running tasks: use last message's values
-    // For completed tasks: result has cumulative values, so use input + output
-    if has_result {
-        // Completed: use final input + output as rough estimate
-        metrics.input_tokens = last_input;
-        metrics.output_tokens = total_output;
-    } else {
-        // Running: current context ≈ cache_read + input
-        metrics.input_tokens = last_cache_read + last_input;
-        metrics.output_tokens = total_output;
-    }
-
+    // Always use last assistant message's values for context calculation
+    metrics.input_tokens = last_cache_read + last_input;
+    metrics.output_tokens = total_output;
     metrics.cache_read_tokens = last_cache_read;
     metrics.num_turns = if metrics.num_turns > 0 {
         metrics.num_turns
@@ -163,6 +149,7 @@ struct ResultEntry {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ModelUsage {
     #[serde(rename = "inputTokens")]
     input_tokens: Option<u64>,
@@ -191,19 +178,31 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_result_entry() {
+    fn test_parse_with_assistant_and_result() {
         let mut file = NamedTempFile::new().unwrap();
+        // Simulate real log: assistant messages followed by result
         writeln!(
             file,
-            r#"{{"type":"result","num_turns":5,"modelUsage":{{"claude-sonnet":{{"inputTokens":1000,"outputTokens":500,"contextWindow":200000}}}}}}"#
-        )
-        .unwrap();
+            r#"{{"type":"assistant","message":{{"usage":{{"input_tokens":10,"output_tokens":100,"cache_read_input_tokens":5000}}}}}}"#
+        ).unwrap();
+        writeln!(
+            file,
+            r#"{{"type":"assistant","message":{{"usage":{{"input_tokens":20,"output_tokens":200,"cache_read_input_tokens":10000}}}}}}"#
+        ).unwrap();
+        writeln!(
+            file,
+            r#"{{"type":"result","num_turns":2,"modelUsage":{{"claude-sonnet":{{"inputTokens":30,"outputTokens":300,"contextWindow":200000}}}}}}"#
+        ).unwrap();
 
         let metrics = parse_log_file(file.path()).unwrap();
-        assert_eq!(metrics.num_turns, 5);
-        assert_eq!(metrics.input_tokens, 1000);
-        assert_eq!(metrics.output_tokens, 500);
+        assert_eq!(metrics.num_turns, 2);
+        // Context = last assistant's cache_read + input = 10000 + 20
+        assert_eq!(metrics.input_tokens, 10020);
+        // Output = cumulative from result
+        assert_eq!(metrics.output_tokens, 300);
         assert_eq!(metrics.context_window, 200_000);
+        // Context percent = 10020 / 200000 = 5%
+        assert_eq!(metrics.context_percent(), 5);
     }
 
     #[test]
