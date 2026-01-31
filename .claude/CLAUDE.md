@@ -102,3 +102,4 @@ cargo install --path .   # 安装到 ~/.cargo/bin
 - @README.md - 用户文档
 - @.claude/rules/rust-style.md - Rust 编码规范
 - @.claude/rules/testing.md - 测试指南
+- @.claude/rules/cli/commands.md - CLI 命令实现规范

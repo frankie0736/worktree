@@ -32,7 +32,7 @@ wt merged auth                             # PR 合并后
 | `wt create --json '{...}'` | 创建任务 |
 | `wt validate [name]` | 验证任务 |
 | `wt list [--tree] [--json]` | 列出任务 |
-| `wt next` | 显示可启动任务 |
+| `wt next [--json]` | 显示可启动任务 |
 | `wt start <name>` | 启动任务 |
 | `wt done <name>` | 标记完成 |
 | `wt merged <name>` | 标记已合并 |

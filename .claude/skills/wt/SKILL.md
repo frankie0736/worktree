@@ -34,6 +34,15 @@ wt next
 # 启动任务
 wt start <name>
 
+# 标记完成
+wt done <name>
+
+# 标记已合并
+wt merged <name>
+
+# 清理资源
+wt cleanup [--all]
+
 # 查看运行中任务状态
 wt status              # 普通视图
 wt status --watch      # 持续监控
