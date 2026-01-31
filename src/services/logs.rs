@@ -40,6 +40,13 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
     let reader = BufReader::new(file);
 
     let mut metrics = LogMetrics::default();
+    // Default context window (will be overwritten if result entry found)
+    metrics.context_window = 200_000;
+
+    // Track running totals from assistant messages
+    let mut running_input: u64 = 0;
+    let mut running_output: u64 = 0;
+    let mut turn_count: u32 = 0;
 
     for line in reader.lines() {
         let line = line.ok()?;
@@ -50,33 +57,33 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
         // Try to parse as JSON
         if let Ok(entry) = serde_json::from_str::<LogEntry>(&line) {
             match entry {
-                LogEntry::System {} | LogEntry::Init {} => {
-                    // Context window will be extracted from result entry
-                }
+                LogEntry::System {} | LogEntry::Init {} => {}
                 LogEntry::Assistant(msg) => {
-                    // Extract usage from assistant messages
+                    // Accumulate usage from each assistant message
                     if let Some(usage) = msg.message.usage {
-                        metrics.input_tokens += usage.input_tokens.unwrap_or(0);
-                        metrics.output_tokens += usage.output_tokens.unwrap_or(0);
+                        // These are per-message values, accumulate them
+                        running_input += usage.input_tokens.unwrap_or(0);
+                        running_output += usage.output_tokens.unwrap_or(0);
                         metrics.cache_creation_tokens +=
                             usage.cache_creation_input_tokens.unwrap_or(0);
                         metrics.cache_read_tokens += usage.cache_read_input_tokens.unwrap_or(0);
+                        turn_count += 1;
                     }
                 }
                 LogEntry::Result(result) => {
-                    metrics.num_turns = result.num_turns.unwrap_or(0);
-                    // Get context window from model usage
+                    // Final result has accurate totals
+                    metrics.num_turns = result.num_turns.unwrap_or(turn_count);
                     if let Some(model_usage) = result.model_usage {
                         for (_, usage) in model_usage {
                             if let Some(cw) = usage.context_window {
                                 metrics.context_window = cw;
                             }
-                            // Also update tokens from result for accuracy
+                            // Use result totals (more accurate than accumulation)
                             if let Some(input) = usage.input_tokens {
-                                metrics.input_tokens = input;
+                                running_input = input;
                             }
                             if let Some(output) = usage.output_tokens {
-                                metrics.output_tokens = output;
+                                running_output = output;
                             }
                         }
                     }
@@ -86,9 +93,11 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
         }
     }
 
-    if metrics.context_window == 0 {
-        // Default context window if not found
-        metrics.context_window = 200_000;
+    // Use running totals
+    metrics.input_tokens = running_input;
+    metrics.output_tokens = running_output;
+    if metrics.num_turns == 0 {
+        metrics.num_turns = turn_count;
     }
 
     Some(metrics)
