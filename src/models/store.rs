@@ -614,6 +614,7 @@ mod tests {
             worktree_path: "/path".to_string(),
             tmux_session: "wt".to_string(),
             tmux_window: "test".to_string(),
+            started_at: None,
         };
         store.set_instance("test", Some(instance));
         assert!(store.get_instance("test").is_some());

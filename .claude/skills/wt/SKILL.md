@@ -34,6 +34,14 @@ wt next
 # 启动任务
 wt start <name>
 
+# 查看运行中任务状态
+wt status              # 普通视图
+wt status --watch      # 持续监控
+wt status --json       # JSON 输出
+
+# 重置任务到 pending
+wt reset <name>
+
 # 进入 tmux 查看 agent
 wt enter [task]
 ```

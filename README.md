@@ -36,6 +36,8 @@ wt merged auth                             # PR 合并后
 | `wt start <name>` | 启动任务 |
 | `wt done <name>` | 标记完成 |
 | `wt merged <name>` | 标记已合并 |
+| `wt reset <name>` | 重置任务到 pending |
+| `wt status [--watch] [--json]` | 查看运行中任务状态 |
 | `wt cleanup [--all]` | 清理资源 |
 | `wt enter [task]` | 进入 tmux |
 

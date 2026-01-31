@@ -1,6 +1,10 @@
 use std::env;
+use std::fs;
+use std::path::Path;
 
-use crate::constants::{TASKS_DIR, branch_name};
+use chrono::Utc;
+
+use crate::constants::{LOGS_DIR, TASKS_DIR, branch_name, log_path};
 use crate::error::{Result, WtError};
 use crate::models::{Instance, TaskStatus, TaskStore, WtConfig};
 use crate::services::{dependency, git, tmux, workspace::WorkspaceInitializer};
@@ -55,22 +59,50 @@ pub fn execute(name: String) -> Result<()> {
         tmux::create_session(&config.tmux_session)?;
     }
 
+    // Ensure logs directory exists
+    let logs_dir = Path::new(LOGS_DIR);
+    if !logs_dir.exists() {
+        fs::create_dir_all(logs_dir).map_err(|e| WtError::Io {
+            operation: "create logs directory".to_string(),
+            path: LOGS_DIR.to_string(),
+            message: e.to_string(),
+        })?;
+    }
+
     // Build agent command with inline prompt
     let prompt = format!(
         "@{}/\n\n请完成任务: {}\n\n任务描述已在上方文件中。",
         TASKS_DIR, name
     );
-    let agent_cmd = format!("{} \"{}\"", config.agent_command, prompt);
+
+    // Build command with optional tee for logging
+    // If agent supports --output-format=stream-json, tee the output to log file
+    let log_file = log_path(&name);
+    let agent_cmd = if config.agent_command.contains("--output-format=stream-json")
+        || config.agent_command.contains("--output-format stream-json")
+    {
+        format!(
+            "{} \"{}\" 2>&1 | tee -a {}",
+            config.agent_command, prompt, log_file
+        )
+    } else {
+        format!("{} \"{}\"", config.agent_command, prompt)
+    };
+
     tmux::create_window(&config.tmux_session, &name, &worktree_path, &agent_cmd)?;
 
     // Update status in StatusStore
     store.set_status(&name, TaskStatus::Running);
-    store.set_instance(&name, Some(Instance {
-        branch: branch.clone(),
-        worktree_path: worktree_path.clone(),
-        tmux_session: config.tmux_session.clone(),
-        tmux_window: name.clone(),
-    }));
+    store.set_instance(
+        &name,
+        Some(Instance {
+            branch: branch.clone(),
+            worktree_path: worktree_path.clone(),
+            tmux_session: config.tmux_session.clone(),
+            tmux_window: name.clone(),
+            started_at: Some(Utc::now()),
+        }),
+    );
     store.save_status()?;
 
     let relative_path = format!("{}/{}", config.worktree_dir, name);

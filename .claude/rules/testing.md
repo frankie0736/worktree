@@ -12,6 +12,7 @@ src/
 │   └── config.rs    # 包含 #[cfg(test)] mod tests
 ├── services/
 │   ├── command.rs   # 包含 #[cfg(test)] mod tests
+│   ├── git.rs       # 包含 #[cfg(test)] mod tests
 │   └── workspace.rs # 包含 #[cfg(test)] mod tests
 tests/
 ├── integration/          # 集成测试（解析、验证逻辑）
@@ -95,4 +96,4 @@ fn test_command_scenario() {
 - 状态转换：TaskStatus.can_transition_to 合法/非法转换
 - 命令执行：CommandRunner 成功/失败场景
 - 工作空间初始化：文件复制、脚本执行、prompt 文件写入
-- CLI 命令：所有 10 个命令的正常和错误场景
+- CLI 命令：所有 12 个命令的正常和错误场景

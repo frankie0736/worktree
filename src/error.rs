@@ -59,6 +59,13 @@ pub enum WtError {
 
     #[error("Invalid state transition: cannot change task from {from} to {to}")]
     InvalidStateTransition { from: String, to: String },
+
+    #[error("Cannot reset '{task}': task '{dependent}' depends on it and is {status}")]
+    HasDependents {
+        task: String,
+        dependent: String,
+        status: String,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, WtError>;

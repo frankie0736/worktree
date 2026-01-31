@@ -4,7 +4,7 @@ use std::path::Path;
 use crate::constants::log_path;
 use crate::error::{Result, WtError};
 use crate::models::{TaskStatus, TaskStore};
-use crate::services::{git, tmux};
+use crate::services::{dependency, git, tmux};
 
 pub fn execute(name: String) -> Result<()> {
     let mut store = TaskStore::load()?;
@@ -15,31 +15,47 @@ pub fn execute(name: String) -> Result<()> {
         .ok_or_else(|| WtError::TaskNotFound(name.clone()))?;
 
     let current_status = store.get_status(&name);
-    if !current_status.can_transition_to(&TaskStatus::Merged) {
-        println!(
-            "Warning: Task '{}' was in {} state (expected done or running).",
-            name,
-            current_status.display_name()
-        );
+
+    // If already Pending, silently succeed (idempotent)
+    if current_status == TaskStatus::Pending {
+        println!("Task '{}' is already pending.", name);
+        return Ok(());
     }
 
+    // Check for non-pending dependents
+    let dependents = dependency::find_non_pending_dependents(&store, &name);
+    if let Some((dep_name, dep_status)) = dependents.first() {
+        return Err(WtError::HasDependents {
+            task: name.clone(),
+            dependent: dep_name.clone(),
+            status: dep_status.display_name().to_string(),
+        });
+    }
+
+    // Cleanup resources (best-effort)
     if let Some(instance) = store.get_instance(&name) {
         println!("Cleaning up resources...");
 
+        // Kill tmux window
         if let Err(e) = tmux::kill_window(&instance.tmux_session, &instance.tmux_window) {
             eprintln!("  Warning: Failed to kill tmux window: {}", e);
+        } else {
+            println!("  Killed tmux window: {}:{}", instance.tmux_session, instance.tmux_window);
         }
 
+        // Remove worktree
         if let Err(e) = git::remove_worktree(&instance.worktree_path) {
             eprintln!("  Warning: Failed to remove worktree: {}", e);
+        } else {
+            println!("  Removed worktree: {}", instance.worktree_path);
         }
 
+        // Delete branch
         if let Err(e) = git::delete_branch(&instance.branch) {
             eprintln!("  Warning: Failed to delete branch: {}", e);
+        } else {
+            println!("  Deleted branch: {}", instance.branch);
         }
-
-        println!("  Removed worktree: {}", instance.worktree_path);
-        println!("  Deleted branch: {}", instance.branch);
     }
 
     // Delete log file if exists
@@ -52,11 +68,11 @@ pub fn execute(name: String) -> Result<()> {
         }
     }
 
-    store.set_status(&name, TaskStatus::Merged);
+    // Update status to Pending and clear instance
+    store.set_status(&name, TaskStatus::Pending);
     store.set_instance(&name, None);
     store.save_status()?;
 
-    println!("Task '{}' marked as merged.", name);
-    println!("Dependent tasks can now be started.");
+    println!("Task '{}' reset to pending.", name);
     Ok(())
 }

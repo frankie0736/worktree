@@ -6,5 +6,7 @@ pub mod init;
 pub mod list;
 pub mod merged;
 pub mod next;
+pub mod reset;
 pub mod start;
+pub mod status;
 pub mod validate;

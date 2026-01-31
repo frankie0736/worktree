@@ -1,5 +1,6 @@
 //! Command execution utilities for git and tmux operations.
 
+use std::path::Path;
 use std::process::{Command, Output};
 
 use crate::error::{Result, WtError};
@@ -8,14 +9,25 @@ use crate::error::{Result, WtError};
 pub struct CommandRunner {
     program: &'static str,
     error_mapper: fn(String) -> WtError,
+    cwd: Option<String>,
 }
 
 impl CommandRunner {
+    /// Create a new command runner with a custom program.
+    pub fn new(program: &'static str) -> Self {
+        Self {
+            program,
+            error_mapper: WtError::Git,
+            cwd: None,
+        }
+    }
+
     /// Create a runner for git commands.
     pub fn git() -> Self {
         Self {
             program: "git",
             error_mapper: WtError::Git,
+            cwd: None,
         }
     }
 
@@ -24,7 +36,14 @@ impl CommandRunner {
         Self {
             program: "tmux",
             error_mapper: WtError::Tmux,
+            cwd: None,
         }
+    }
+
+    /// Set the working directory for the command.
+    pub fn current_dir(mut self, dir: &str) -> Self {
+        self.cwd = Some(dir.to_string());
+        self
     }
 
     /// Run a command and check for success.
@@ -33,18 +52,37 @@ impl CommandRunner {
         self.check_status(output)
     }
 
+    /// Run a command and return stdout as a string.
+    pub fn output(&self, args: &[&str]) -> Result<String> {
+        let output = self.execute(args)?;
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        } else {
+            Err((self.error_mapper)(
+                String::from_utf8_lossy(&output.stderr).to_string(),
+            ))
+        }
+    }
+
     /// Check if a command succeeds without returning an error.
     pub fn success(&self, args: &[&str]) -> bool {
-        Command::new(self.program)
-            .args(args)
+        self.build_command(args)
             .output()
             .map(|o| o.status.success())
             .unwrap_or(false)
     }
 
+    fn build_command(&self, args: &[&str]) -> Command {
+        let mut cmd = Command::new(self.program);
+        cmd.args(args);
+        if let Some(ref cwd) = self.cwd {
+            cmd.current_dir(Path::new(cwd));
+        }
+        cmd
+    }
+
     fn execute(&self, args: &[&str]) -> Result<Output> {
-        Command::new(self.program)
-            .args(args)
+        self.build_command(args)
             .output()
             .map_err(|e| (self.error_mapper)(e.to_string()))
     }

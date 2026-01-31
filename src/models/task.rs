@@ -55,6 +55,8 @@ pub struct Instance {
     pub worktree_path: String,
     pub tmux_session: String,
     pub tmux_window: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub started_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Frontmatter of task markdown file (definition only, no runtime state)

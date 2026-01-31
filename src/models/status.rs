@@ -50,7 +50,7 @@ impl StatusStore {
         })
     }
 
-    /// Save status to .wt/status.json
+    /// Save status to .wt/status.json (atomic write via temp file + rename)
     pub fn save(&self) -> Result<()> {
         let path = Path::new(STATUS_FILE);
 
@@ -69,8 +69,16 @@ impl StatusStore {
             WtError::InvalidTaskFile(format!("Failed to serialize status: {}", e))
         })?;
 
-        fs::write(path, content).map_err(|e| WtError::Io {
-            operation: "save status file".to_string(),
+        // Atomic write: write to temp file, then rename
+        let temp_path = format!("{}.tmp", STATUS_FILE);
+        fs::write(&temp_path, &content).map_err(|e| WtError::Io {
+            operation: "write temp status file".to_string(),
+            path: temp_path.clone(),
+            message: e.to_string(),
+        })?;
+
+        fs::rename(&temp_path, path).map_err(|e| WtError::Io {
+            operation: "rename status file".to_string(),
             path: STATUS_FILE.to_string(),
             message: e.to_string(),
         })?;
@@ -141,6 +149,7 @@ mod tests {
             worktree_path: "/path".to_string(),
             tmux_session: "wt".to_string(),
             tmux_window: "test".to_string(),
+            started_at: None,
         };
         store.set_instance("test", Some(instance.clone()));
 

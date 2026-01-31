@@ -66,7 +66,6 @@
 ```markdown
 ---
 name: user-auth
-status: pending
 depends: []
 ---
 
@@ -83,6 +82,8 @@ depends: []
 - [ ] Session 管理
 - [ ] 保护路由中间件
 ```
+
+> 注：任务状态存储在 `.wt/status.json` 中，不在 markdown frontmatter 里。
 
 ## 错误处理
 

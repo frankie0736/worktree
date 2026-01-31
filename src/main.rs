@@ -1,6 +1,7 @@
 mod cli;
 mod commands;
 mod constants;
+mod display;
 mod error;
 mod models;
 mod services;
@@ -22,6 +23,8 @@ fn main() {
         Commands::Cleanup { all } => commands::cleanup::execute(all),
         Commands::Next { json } => commands::next::execute(json),
         Commands::Enter { name } => commands::enter::execute(name),
+        Commands::Reset { name } => commands::reset::execute(name),
+        Commands::Status { json, watch } => commands::status::execute(json, watch),
     };
 
     if let Err(e) = result {

@@ -32,3 +32,7 @@ mod enter;
 mod help;
 #[path = "cli/no_config.rs"]
 mod no_config;
+#[path = "cli/reset.rs"]
+mod reset;
+#[path = "cli/status.rs"]
+mod status;

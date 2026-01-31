@@ -14,6 +14,7 @@ src/
 ├── lib.rs            # 库导出
 ├── cli.rs            # Clap 命令定义
 ├── constants.rs      # 路径常量 (TASKS_DIR, STATUS_FILE 等)
+├── display.rs        # 显示格式化 (format_duration 等)
 ├── error.rs          # 错误类型 (WtError)
 ├── models/
 │   ├── task.rs       # Task, TaskStatus, TaskInput, TaskFrontmatter
@@ -29,6 +30,8 @@ src/
 │   ├── start.rs
 │   ├── done.rs
 │   ├── merged.rs
+│   ├── reset.rs
+│   ├── status.rs
 │   ├── cleanup.rs
 │   └── enter.rs
 └── services/
@@ -67,6 +70,8 @@ depends:            # 依赖的任务列表
 ```
 ○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged
    (wt start)    (wt done)    (wt merged)
+      ↑______________|
+        (wt reset)
 ```
 
 ### 依赖规则
