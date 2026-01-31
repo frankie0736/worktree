@@ -43,10 +43,13 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
     // Default context window (will be overwritten if result entry found)
     metrics.context_window = 200_000;
 
-    // Track running totals from assistant messages
-    let mut running_input: u64 = 0;
-    let mut running_output: u64 = 0;
+    // Track the LAST assistant message's usage (not cumulative)
+    // because cache_read_input_tokens represents current context size
+    let mut last_cache_read: u64 = 0;
+    let mut last_input: u64 = 0;
+    let mut total_output: u64 = 0;
     let mut turn_count: u32 = 0;
+    let mut has_result = false;
 
     for line in reader.lines() {
         let line = line.ok()?;
@@ -59,31 +62,35 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
             match entry {
                 LogEntry::System {} | LogEntry::Init {} => {}
                 LogEntry::Assistant(msg) => {
-                    // Accumulate usage from each assistant message
                     if let Some(usage) = msg.message.usage {
-                        // These are per-message values, accumulate them
-                        running_input += usage.input_tokens.unwrap_or(0);
-                        running_output += usage.output_tokens.unwrap_or(0);
+                        // cache_read = current context (conversation history from cache)
+                        // input = new tokens this turn
+                        // Together they represent current context size
+                        last_cache_read = usage.cache_read_input_tokens.unwrap_or(0);
+                        last_input = usage.input_tokens.unwrap_or(0);
+                        total_output += usage.output_tokens.unwrap_or(0);
                         metrics.cache_creation_tokens +=
                             usage.cache_creation_input_tokens.unwrap_or(0);
-                        metrics.cache_read_tokens += usage.cache_read_input_tokens.unwrap_or(0);
                         turn_count += 1;
                     }
                 }
                 LogEntry::Result(result) => {
-                    // Final result has accurate totals
+                    has_result = true;
                     metrics.num_turns = result.num_turns.unwrap_or(turn_count);
                     if let Some(model_usage) = result.model_usage {
                         for (_, usage) in model_usage {
                             if let Some(cw) = usage.context_window {
                                 metrics.context_window = cw;
                             }
-                            // Use result totals (more accurate than accumulation)
+                            // For completed tasks, use final totals
                             if let Some(input) = usage.input_tokens {
-                                running_input = input;
+                                last_input = input;
                             }
                             if let Some(output) = usage.output_tokens {
-                                running_output = output;
+                                total_output = output;
+                            }
+                            if let Some(cache_read) = usage.cache_read_input_tokens {
+                                last_cache_read = cache_read;
                             }
                         }
                     }
@@ -93,12 +100,25 @@ pub fn parse_log_file(path: &Path) -> Option<LogMetrics> {
         }
     }
 
-    // Use running totals
-    metrics.input_tokens = running_input;
-    metrics.output_tokens = running_output;
-    if metrics.num_turns == 0 {
-        metrics.num_turns = turn_count;
+    // Current context = cache_read (history) + input (new tokens)
+    // For running tasks: use last message's values
+    // For completed tasks: result has cumulative values, so use input + output
+    if has_result {
+        // Completed: use final input + output as rough estimate
+        metrics.input_tokens = last_input;
+        metrics.output_tokens = total_output;
+    } else {
+        // Running: current context ≈ cache_read + input
+        metrics.input_tokens = last_cache_read + last_input;
+        metrics.output_tokens = total_output;
     }
+
+    metrics.cache_read_tokens = last_cache_read;
+    metrics.num_turns = if metrics.num_turns > 0 {
+        metrics.num_turns
+    } else {
+        turn_count
+    };
 
     Some(metrics)
 }
@@ -148,6 +168,8 @@ struct ModelUsage {
     input_tokens: Option<u64>,
     #[serde(rename = "outputTokens")]
     output_tokens: Option<u64>,
+    #[serde(rename = "cacheReadInputTokens")]
+    cache_read_input_tokens: Option<u64>,
     #[serde(rename = "contextWindow")]
     context_window: Option<u64>,
 }
