@@ -1,6 +1,7 @@
 //! CLI tests for wt status command
 
 use crate::common::*;
+use serde_json::json;
 
 #[test]
 fn test_status_no_tasks() {
@@ -113,4 +114,61 @@ fn test_status_summary_line() {
     assert!(stdout.contains("Summary:"));
     assert!(stdout.contains("1 running"));
     assert!(stdout.contains("1 done"));
+}
+
+#[test]
+fn test_status_shows_warning_when_tmux_window_closed() {
+    let dir = setup_test_repo();
+
+    // Create task file
+    create_task_file(dir.path(), "task1", &[]);
+
+    // Set running status with instance pointing to non-existent tmux window
+    set_task_status_with_instance(
+        dir.path(),
+        "task1",
+        "running",
+        Some(json!({
+            "branch": "wt/task1",
+            "worktree_path": "/tmp/nonexistent",
+            "tmux_session": "nonexistent-session-12345",
+            "tmux_window": "task1"
+        })),
+    );
+
+    let (ok, stdout, _stderr) = run_wt(dir.path(), &["status"]);
+
+    assert!(ok);
+    assert!(stdout.contains("task1"));
+    assert!(stdout.contains("tmux window closed"), "Should warn about closed tmux window: {}", stdout);
+}
+
+#[test]
+fn test_status_json_includes_tmux_alive_field() {
+    let dir = setup_test_repo();
+
+    // Create task file
+    create_task_file(dir.path(), "task1", &[]);
+
+    // Set running status with instance pointing to non-existent tmux window
+    set_task_status_with_instance(
+        dir.path(),
+        "task1",
+        "running",
+        Some(json!({
+            "branch": "wt/task1",
+            "worktree_path": "/tmp/nonexistent",
+            "tmux_session": "nonexistent-session-12345",
+            "tmux_window": "task1"
+        })),
+    );
+
+    let (ok, stdout, _stderr) = run_wt(dir.path(), &["status", "--json"]);
+
+    assert!(ok);
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    let tasks = json.get("tasks").unwrap().as_array().unwrap();
+    let task = &tasks[0];
+
+    assert_eq!(task.get("tmux_alive").unwrap().as_bool().unwrap(), false);
 }

@@ -9,7 +9,7 @@ use crate::constants::{IDLE_THRESHOLD_SECS, WATCH_INTERVAL_SECS};
 use crate::display::format_duration;
 use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore, WtConfig};
-use crate::services::git;
+use crate::services::{git, tmux};
 
 #[derive(Serialize)]
 struct TaskMetrics {
@@ -29,6 +29,8 @@ struct TaskMetrics {
     idle_secs: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     active: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tmux_alive: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -120,6 +122,13 @@ fn display_status(json: bool) -> Result<()> {
                 config.as_ref().and_then(|_| git::get_commit_count(p, "HEAD~100"))
             });
 
+        // Check if tmux window is alive (only for running tasks)
+        let tmux_alive = if status == TaskStatus::Running {
+            instance.map(|i| tmux::window_exists(&i.tmux_session, &i.tmux_window))
+        } else {
+            None
+        };
+
         // Get idle time and activity status
         let (idle_secs, active) = if let Some(path) = worktree_path {
             if let Some(last_activity) = git::get_last_activity(path) {
@@ -146,6 +155,7 @@ fn display_status(json: bool) -> Result<()> {
             commits,
             idle_secs,
             active,
+            tmux_alive,
         });
     }
 
@@ -178,10 +188,14 @@ fn print_human_readable(output: &StatusOutput) {
     println!();
 
     for task in &output.tasks {
-        let active_indicator = match task.active {
-            Some(true) => " 🟢",
-            Some(false) => " 💤",
-            None => "",
+        // tmux_alive takes precedence: if window is dead, show warning
+        let status_indicator = match task.tmux_alive {
+            Some(false) => " ⚠️  (tmux window closed)",
+            _ => match task.active {
+                Some(true) => " 🟢",
+                Some(false) => " 💤",
+                None => "",
+            },
         };
 
         println!(
@@ -189,7 +203,7 @@ fn print_human_readable(output: &StatusOutput) {
             task.status.icon(),
             task.name,
             task.status.display_name(),
-            active_indicator
+            status_indicator
         );
 
         if let Some(ref duration) = task.duration_human {

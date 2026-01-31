@@ -104,6 +104,16 @@ pub fn create_task_file(dir: &Path, name: &str, depends: &[&str]) {
 
 /// Set task status in status.json
 pub fn set_task_status(dir: &Path, name: &str, status: &str) {
+    set_task_status_with_instance(dir, name, status, None);
+}
+
+/// Set task status with optional instance info in status.json
+pub fn set_task_status_with_instance(
+    dir: &Path,
+    name: &str,
+    status: &str,
+    instance: Option<serde_json::Value>,
+) {
     let status_file = dir.join(".wt/status.json");
     let wt_dir = dir.join(".wt");
     fs::create_dir_all(&wt_dir).unwrap();
@@ -121,12 +131,13 @@ pub fn set_task_status(dir: &Path, name: &str, status: &str) {
         .entry("tasks".to_string())
         .or_insert_with(|| serde_json::json!({}));
 
-    // Set task status
+    // Set task status with optional instance
     if let Some(tasks_obj) = tasks.as_object_mut() {
-        tasks_obj.insert(
-            name.to_string(),
-            serde_json::json!({ "status": status }),
-        );
+        let mut task_data = serde_json::json!({ "status": status });
+        if let Some(inst) = instance {
+            task_data["instance"] = inst;
+        }
+        tasks_obj.insert(name.to_string(), task_data);
     }
 
     fs::write(&status_file, serde_json::to_string_pretty(&status_data).unwrap()).unwrap();
