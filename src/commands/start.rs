@@ -77,7 +77,8 @@ pub fn execute(name: String) -> Result<()> {
 
     // Build command with optional tee for logging
     // If agent supports --output-format=stream-json, tee the output to log file
-    let log_file = log_path(&name);
+    // Use absolute path since tmux window cwd is the worktree, not main project
+    let log_file = cwd.join(log_path(&name)).to_string_lossy().to_string();
     let agent_cmd = if config.agent_command.contains("--output-format=stream-json")
         || config.agent_command.contains("--output-format stream-json")
     {
