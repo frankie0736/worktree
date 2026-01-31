@@ -5,6 +5,7 @@ mod display;
 mod error;
 mod models;
 mod services;
+mod tui;
 
 use clap::Parser;
 use cli::{Cli, Commands};

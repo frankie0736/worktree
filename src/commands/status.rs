@@ -49,7 +49,13 @@ struct StatusSummary {
 
 pub fn execute(json: bool, watch: bool) -> Result<()> {
     if watch {
-        run_watch_mode(json)
+        if json {
+            // JSON watch mode uses simple refresh
+            run_watch_mode(json)
+        } else {
+            // Interactive TUI mode
+            crate::tui::run()
+        }
     } else {
         display_status(json)
     }

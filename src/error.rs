@@ -32,6 +32,9 @@ pub enum WtError {
     #[error("Task '{0}' is already running")]
     AlreadyRunning(String),
 
+    #[error("Task '{0}' is not running")]
+    TaskNotRunning(String),
+
     #[error("Branch '{0}' already exists.\nHint: Run `git branch -D {0}` to delete it, then retry.")]
     BranchExists(String),
 
