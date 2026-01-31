@@ -48,6 +48,9 @@ struct StatusSummary {
 }
 
 pub fn execute(json: bool, watch: bool) -> Result<()> {
+    // Verify we're in a wt project directory
+    WtConfig::load()?;
+
     if watch {
         if json {
             // JSON watch mode uses simple refresh

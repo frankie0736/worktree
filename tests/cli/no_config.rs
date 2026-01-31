@@ -48,3 +48,13 @@ fn test_next_without_config() {
     assert!(ok);
     assert!(stdout.contains("task1"));
 }
+
+#[test]
+fn test_status_without_config() {
+    let dir = tempfile::tempdir().unwrap();
+
+    let (ok, _, stderr) = run_wt(dir.path(), &["status"]);
+
+    assert!(!ok);
+    assert!(stderr.contains("Config") || stderr.contains(".wt.yaml"));
+}
