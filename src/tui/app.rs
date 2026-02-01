@@ -232,10 +232,10 @@ impl App {
         }
     }
 
-    /// Check if selected task can be marked as done (Running + tmux exited)
+    /// Check if selected task can be marked as done (Running status)
     pub fn can_mark_done(&self) -> bool {
         self.selected_task()
-            .map(|t| t.status == TaskStatus::Running && !t.tmux_alive)
+            .map(|t| t.status == TaskStatus::Running)
             .unwrap_or(false)
     }
 
@@ -246,11 +246,19 @@ impl App {
             .unwrap_or(false)
     }
 
-    /// Mark selected task as done
+    /// Mark selected task as done (closes tmux if still running)
     pub fn mark_done(&mut self) -> Result<()> {
         if let Some(task) = self.selected_task() {
-            if task.status == TaskStatus::Running && !task.tmux_alive {
+            if task.status == TaskStatus::Running {
                 let name = task.name.clone();
+
+                // Close tmux window if still alive
+                if task.tmux_alive {
+                    if let (Some(session), Some(window)) = (&task.tmux_session, &task.tmux_window) {
+                        crate::services::tmux::kill_window(session, window).ok();
+                    }
+                }
+
                 let mut store = TaskStore::load()?;
                 store.set_status(&name, TaskStatus::Done);
                 store.save_status()?;

@@ -241,7 +241,11 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 spans.push(Span::raw(" tail  "));
             }
 
-            if task.status == TaskStatus::Done {
+            if task.status == TaskStatus::Running {
+                // Running: d (done)
+                spans.push(Span::styled("d", Style::default().fg(Color::Yellow)));
+                spans.push(Span::raw(" done  "));
+            } else if task.status == TaskStatus::Done {
                 // Done: m (merged)
                 spans.push(Span::styled("m", Style::default().fg(Color::Yellow)));
                 spans.push(Span::raw(" merged  "));
@@ -249,10 +253,6 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 // Merged: a (archive)
                 spans.push(Span::styled("a", Style::default().fg(Color::Yellow)));
                 spans.push(Span::raw(" archive  "));
-            } else if task.status == TaskStatus::Running && !task.tmux_alive {
-                // Running but tmux exited: d (done)
-                spans.push(Span::styled("d", Style::default().fg(Color::Yellow)));
-                spans.push(Span::raw(" done  "));
             }
         }
 

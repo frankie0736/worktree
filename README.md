@@ -39,7 +39,7 @@ wt reset auth                              # 重置（会备份代码）
 | `wt list [--tree] [--json]` | 列出任务 |
 | `wt next [--json]` | 显示可启动任务 |
 | `wt start <name>` | 启动任务 |
-| `wt status [--json]` | 查看状态 (默认 TUI) |
+| `wt status [--json] [--action X --task Y]` | 查看状态 (默认 TUI) |
 | `wt tail <name> [-n N]` | 查看最后 N 条输出 (JSON) |
 | `wt logs` | 生成所有任务的过滤日志 |
 | `wt done <name>` | 标记完成 |
@@ -54,16 +54,23 @@ wt reset auth                              # 重置（会备份代码）
 | `↑↓` / `jk` | 导航 |
 | `Enter` | 进入 tmux 窗口 |
 | `t` | tail (查看输出) |
-| `d` | 标记 done (agent 已退出) |
+| `d` | 标记 done (自动关闭 tmux) |
 | `m` | 标记 merged |
-| `a` | archive (归档，仅 Merged 状态) |
+| `a` | archive (归档) |
 | `q` | 退出 |
 
-**Enter 行为**：
-- tmux 内 + 窗口存在 → 切换到目标窗口
-- tmux 内 + 窗口已关 → 输出 resume 命令
-- tmux 外 + 窗口存在 → 执行 `tmux attach`
-- tmux 外 + 窗口已关 → 输出 resume 命令
+## Status --action 参数
+
+非交互方式执行 TUI 操作，返回 JSON：
+
+```bash
+wt status --action list --task ui      # 查看可用操作
+wt status --action done --task ui      # 标记完成
+wt status --action merged --task ui    # 标记已合并
+wt status --action archive --task ui   # 归档任务
+wt status --action enter --task ui     # 获取 tmux 命令
+wt status --action tail --task ui      # 查看输出
+```
 
 ## 配置
 

@@ -1,99 +1,94 @@
 # 测试指南
 
-## 测试结构
+## 运行测试
 
-```
-src/
-├── commands/
-│   └── init.rs      # 包含 #[cfg(test)] mod tests
-├── models/
-│   ├── task.rs      # 包含 #[cfg(test)] mod tests
-│   ├── store.rs     # 包含 #[cfg(test)] mod tests
-│   └── config.rs    # 包含 #[cfg(test)] mod tests
-├── services/
-│   ├── command.rs   # 包含 #[cfg(test)] mod tests
-│   ├── git.rs       # 包含 #[cfg(test)] mod tests
-│   └── workspace.rs # 包含 #[cfg(test)] mod tests
-tests/
-├── integration/          # 集成测试（解析、验证逻辑）
-├── cli/                  # CLI E2E 测试（每个命令一个文件）
-│   ├── init.rs
-│   ├── create.rs
-│   ├── list.rs
-│   └── ...
-├── cli.rs                # CLI 测试入口
-└── integration.rs        # 集成测试入口
+```bash
+cargo test                    # 全部
+cargo test --lib              # 单元测试
+cargo test --test cli         # CLI E2E
+cargo test --test cli init    # 单个命令
 ```
 
 ## 测试分类
 
-| 类型 | 位置 | 特点 |
+| 类型 | 位置 | 说明 |
 |------|------|------|
-| 单元测试 | `src/**/*.rs` 内 `#[cfg(test)]` | 测试单个函数，快速 |
-| 集成测试 | `tests/integration/` | 测试模块协作 |
-| CLI/E2E | `tests/cli/` | 运行真实二进制，创建临时 git 仓库 |
+| 单元 | `src/**/*.rs` 内 `#[cfg(test)]` | 快速，测单个函数 |
+| 集成 | `tests/integration/` | 模块协作 |
+| CLI | `tests/cli/` | 真实二进制 + 临时 git 仓库 |
 
-## 运行测试
-
-```bash
-cargo test                    # 全部测试
-cargo test --lib              # 仅单元测试
-cargo test --test cli         # 仅 CLI 测试
-cargo test --test cli init    # 仅 init 命令测试
-cargo test test_name          # 运行特定测试
-```
-
-## 编写新测试
-
-### 单元测试模板
+## 编写测试
 
 ```rust
+// 单元测试
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_功能_场景_预期() {
-        // Arrange
-        let input = ...;
-
-        // Act
         let result = function(input);
-
-        // Assert
         assert_eq!(result, expected);
     }
 }
-```
 
-### CLI 测试模板
-
-```rust
+// CLI 测试
 #[test]
 fn test_command_scenario() {
-    let dir = setup_test_repo();  // 创建临时 git 仓库
-
-    let (ok, stdout, stderr) = run_wt(dir.path(), &["command", "args"]);
-
+    let dir = setup_test_repo();
+    let (ok, stdout, _) = run_wt(dir.path(), &["command", "args"]);
     assert!(ok);
-    assert!(stdout.contains("expected output"));
 }
 ```
 
-## 测试覆盖要点
+## 手动测试
 
-### 必须测试
+需要真实 tmux/worktree 环境的功能，使用 mock 项目测试：
 
-- 所有公开 API 的正常路径
-- 所有错误类型至少一个触发场景
-- 边界条件（空输入、超长输入、特殊字符）
+```bash
+cd /Users/yansir/code/nextjs-project/try-wt
+```
 
-### 当前覆盖
+### --action 操作
 
-- 任务名验证：空、空格、特殊字符、非法开头/结尾
-- Markdown 解析：缺少 frontmatter、无效 YAML、Unicode
-- 循环依赖：自引用、简单循环、长链循环、菱形图
-- 状态转换：TaskStatus.can_transition_to 合法/非法转换
-- 命令执行：CommandRunner 成功/失败场景
-- 工作空间初始化：文件复制、脚本执行、prompt 文件写入
-- CLI 命令：所有 12 个命令的正常和错误场景
+```bash
+wt start ui                              # 启动任务
+wt status --action list --task ui        # 预期: available_actions 含 done
+wt status --action enter --task ui       # 预期: command.type = tmux_switch
+wt status --action done --task ui        # 预期: success, tmux 被关闭
+wt status --action merged --task ui      # 预期: success
+wt status --action archive --task ui     # 预期: success
+wt reset ui                              # 重置
+```
+
+### 错误场景
+
+```bash
+wt status --action list                  # 缺 --task → JSON error
+wt status --action list --task xxx       # 不存在 → JSON error
+wt status --action unknown --task ui     # 未知操作 → JSON error
+```
+
+### 冲突检测
+
+```bash
+wt start ui
+
+# 主仓库
+echo "main" >> README.md && git add . && git commit -m "main"
+
+# worktree
+cd .wt/worktrees/ui
+echo "wt" >> README.md && git add . && git commit -m "wt"
+git merge main  # 冲突
+
+# 验证
+cd /Users/yansir/code/nextjs-project/try-wt
+wt status --json | jq '.tasks[0].has_conflict'  # true
+
+# 清理
+cd .wt/worktrees/ui && git merge --abort
+cd /Users/yansir/code/nextjs-project/try-wt
+git reset --hard HEAD~1
+wt reset ui
+```

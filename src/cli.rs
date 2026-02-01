@@ -80,6 +80,14 @@ pub enum Commands {
         /// Output as JSON for programmatic use (non-interactive)
         #[arg(long)]
         json: bool,
+
+        /// Execute action on task (list, done, merged, archive, enter, tail)
+        #[arg(long, value_name = "ACTION")]
+        action: Option<String>,
+
+        /// Target task name (required with --action)
+        #[arg(long, value_name = "NAME")]
+        task: Option<String>,
     },
 
     /// View last assistant messages from task transcript (JSON output)

@@ -1,5 +1,6 @@
 use crate::error::{Result, WtError};
 use crate::models::{TaskStatus, TaskStore};
+use crate::services::tmux;
 
 pub fn execute(name: String) -> Result<()> {
     let mut store = TaskStore::load()?;
@@ -15,6 +16,14 @@ pub fn execute(name: String) -> Result<()> {
             from: current_status.display_name().to_string(),
             to: TaskStatus::Done.display_name().to_string(),
         });
+    }
+
+    // Close tmux window if still alive
+    if let Some(instance) = store.get_instance(&name) {
+        if tmux::window_exists(&instance.tmux_session, &instance.tmux_window) {
+            tmux::kill_window(&instance.tmux_session, &instance.tmux_window)?;
+            println!("Closed tmux window {}:{}", instance.tmux_session, instance.tmux_window);
+        }
     }
 
     store.set_status(&name, TaskStatus::Done);

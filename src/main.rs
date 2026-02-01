@@ -24,7 +24,7 @@ fn main() {
         Commands::Archive { name } => commands::archive::execute(name),
         Commands::Next { json } => commands::next::execute(json),
         Commands::Reset { name } => commands::reset::execute(name),
-        Commands::Status { json } => commands::status::execute(json),
+        Commands::Status { json, action, task } => commands::status::execute(json, action, task),
         Commands::Tail { name, count } => commands::tail::execute(name, count),
         Commands::Logs => commands::logs::execute(),
     };
