@@ -5,77 +5,111 @@ use crate::tui::{App, TuiAction};
 
 use super::types::{ActionResponse, CommandInfo, TaskInfo};
 
+// ============================================================================
+// Response Builder Helpers
+// ============================================================================
+
+/// Build a successful action response with task state transition info
+fn success_response(action: &str, task_name: &str, before: TaskStatus, after: TaskStatus) -> ActionResponse {
+    ActionResponse {
+        action: action.to_string(),
+        success: true,
+        error: None,
+        task: Some(TaskInfo {
+            name: task_name.to_string(),
+            status: None,
+            status_before: Some(before),
+            status_after: Some(after),
+            tmux_alive: None,
+        }),
+        available_actions: None,
+        unavailable_actions: None,
+        command: None,
+    }
+}
+
+/// Build an error response for action failures
+fn error_response(action: &str, error: &str, task_name: &str, status: Option<TaskStatus>, tmux_alive: Option<bool>) -> ActionResponse {
+    ActionResponse {
+        action: action.to_string(),
+        success: false,
+        error: Some(error.to_string()),
+        task: Some(TaskInfo {
+            name: task_name.to_string(),
+            status,
+            status_before: None,
+            status_after: None,
+            tmux_alive,
+        }),
+        available_actions: None,
+        unavailable_actions: None,
+        command: None,
+    }
+}
+
+/// Build an error response without task info (for early failures)
+fn error_response_no_task(action: &str, error: &str) -> ActionResponse {
+    ActionResponse {
+        action: action.to_string(),
+        success: false,
+        error: Some(error.to_string()),
+        task: None,
+        available_actions: None,
+        unavailable_actions: None,
+        command: None,
+    }
+}
+
+/// Build a "task not found" error response
+fn task_not_found_response(action: &str, task_name: &str) -> ActionResponse {
+    ActionResponse {
+        action: action.to_string(),
+        success: false,
+        error: Some(format!(
+            "Task '{}' not found (only running/done/merged tasks are available)",
+            task_name
+        )),
+        task: Some(TaskInfo {
+            name: task_name.to_string(),
+            status: None,
+            status_before: None,
+            status_after: None,
+            tmux_alive: None,
+        }),
+        available_actions: None,
+        unavailable_actions: None,
+        command: None,
+    }
+}
+
+/// Print response as JSON and exit with appropriate code
+fn respond_and_exit(response: ActionResponse) -> ! {
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+    std::process::exit(if response.success { 0 } else { 1 });
+}
+
+// ============================================================================
+// Action Execution
+// ============================================================================
+
 /// Execute an action via the --action API
 pub fn execute_action(action: &str, task_name: Option<String>) {
-    // Missing --task parameter
     let task_name = match task_name {
         Some(name) => name,
-        None => {
-            let response = ActionResponse {
-                action: action.to_string(),
-                success: false,
-                error: Some("--task is required with --action".to_string()),
-                task: None,
-                available_actions: None,
-                unavailable_actions: None,
-                command: None,
-            };
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&response).unwrap_or_default()
-            );
-            std::process::exit(1);
-        }
+        None => respond_and_exit(error_response_no_task(action, "--task is required with --action")),
     };
 
     let mut app = match App::new() {
         Ok(app) => app,
-        Err(e) => {
-            let response = ActionResponse {
-                action: action.to_string(),
-                success: false,
-                error: Some(format!("Failed to initialize: {}", e)),
-                task: None,
-                available_actions: None,
-                unavailable_actions: None,
-                command: None,
-            };
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&response).unwrap_or_default()
-            );
-            std::process::exit(1);
-        }
+        Err(e) => respond_and_exit(error_response_no_task(action, &format!("Failed to initialize: {}", e))),
     };
 
-    // Find target task in app.tasks
     let task_idx = match app.tasks.iter().position(|t| t.name == task_name) {
         Some(idx) => idx,
-        None => {
-            let response = ActionResponse {
-                action: action.to_string(),
-                success: false,
-                error: Some(format!(
-                    "Task '{}' not found (only running/done/merged tasks are available)",
-                    task_name
-                )),
-                task: Some(TaskInfo {
-                    name: task_name,
-                    status: None,
-                    status_before: None,
-                    status_after: None,
-                    tmux_alive: None,
-                }),
-                available_actions: None,
-                unavailable_actions: None,
-                command: None,
-            };
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&response).unwrap_or_default()
-            );
-            std::process::exit(1);
-        }
+        None => respond_and_exit(task_not_found_response(action, &task_name)),
     };
 
     app.selected = task_idx;
@@ -185,58 +219,17 @@ fn handle_list_action(app: &App, task_name: &str) -> ActionResponse {
 fn handle_done_action(app: &mut App, task_name: &str) -> ActionResponse {
     let task = app.selected_task().unwrap();
     let status_before = task.status.clone();
+    let tmux_alive = task.tmux_alive;
 
     if !app.can_mark_done() {
-        return ActionResponse {
-            action: "done".to_string(),
-            success: false,
-            error: Some("Cannot mark as done: task is not running".to_string()),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: Some(status_before),
-                status_before: None,
-                status_after: None,
-                tmux_alive: Some(task.tmux_alive),
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        };
+        return error_response("done", "Cannot mark as done: task is not running", task_name, Some(status_before), Some(tmux_alive));
     }
 
     if let Err(e) = app.mark_done() {
-        return ActionResponse {
-            action: "done".to_string(),
-            success: false,
-            error: Some(format!("Failed to mark as done: {}", e)),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: Some(status_before),
-                status_before: None,
-                status_after: None,
-                tmux_alive: None,
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        };
+        return error_response("done", &format!("Failed to mark as done: {}", e), task_name, Some(status_before), None);
     }
 
-    ActionResponse {
-        action: "done".to_string(),
-        success: true,
-        error: None,
-        task: Some(TaskInfo {
-            name: task_name.to_string(),
-            status: None,
-            status_before: Some(status_before),
-            status_after: Some(TaskStatus::Done),
-            tmux_alive: None,
-        }),
-        available_actions: None,
-        unavailable_actions: None,
-        command: None,
-    }
+    success_response("done", task_name, status_before, TaskStatus::Done)
 }
 
 fn handle_merged_action(app: &mut App, task_name: &str) -> ActionResponse {
@@ -244,59 +237,20 @@ fn handle_merged_action(app: &mut App, task_name: &str) -> ActionResponse {
     let status_before = task.status.clone();
 
     if !app.can_mark_merged() {
-        return ActionResponse {
-            action: "merged".to_string(),
-            success: false,
-            error: Some(format!(
-                "Cannot mark as merged: task is {} (need done)",
-                status_before.display_name()
-            )),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: Some(status_before),
-                status_before: None,
-                status_after: None,
-                tmux_alive: None,
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        };
+        return error_response(
+            "merged",
+            &format!("Cannot mark as merged: task is {} (need done)", status_before.display_name()),
+            task_name,
+            Some(status_before),
+            None,
+        );
     }
 
     if let Err(e) = app.mark_merged() {
-        return ActionResponse {
-            action: "merged".to_string(),
-            success: false,
-            error: Some(format!("Failed to mark as merged: {}", e)),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: Some(status_before),
-                status_before: None,
-                status_after: None,
-                tmux_alive: None,
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        };
+        return error_response("merged", &format!("Failed to mark as merged: {}", e), task_name, Some(status_before), None);
     }
 
-    ActionResponse {
-        action: "merged".to_string(),
-        success: true,
-        error: None,
-        task: Some(TaskInfo {
-            name: task_name.to_string(),
-            status: None,
-            status_before: Some(status_before),
-            status_after: Some(TaskStatus::Merged),
-            tmux_alive: None,
-        }),
-        available_actions: None,
-        unavailable_actions: None,
-        command: None,
-    }
+    success_response("merged", task_name, status_before, TaskStatus::Merged)
 }
 
 fn handle_archive_action(app: &mut App, task_name: &str) -> ActionResponse {
@@ -304,59 +258,20 @@ fn handle_archive_action(app: &mut App, task_name: &str) -> ActionResponse {
     let status_before = task.status.clone();
 
     if !app.can_archive() {
-        return ActionResponse {
-            action: "archive".to_string(),
-            success: false,
-            error: Some(format!(
-                "Cannot archive: task is {} (need merged)",
-                status_before.display_name()
-            )),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: Some(status_before),
-                status_before: None,
-                status_after: None,
-                tmux_alive: None,
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        };
+        return error_response(
+            "archive",
+            &format!("Cannot archive: task is {} (need merged)", status_before.display_name()),
+            task_name,
+            Some(status_before),
+            None,
+        );
     }
 
     if let Err(e) = app.archive() {
-        return ActionResponse {
-            action: "archive".to_string(),
-            success: false,
-            error: Some(format!("Failed to archive: {}", e)),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: Some(status_before),
-                status_before: None,
-                status_after: None,
-                tmux_alive: None,
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        };
+        return error_response("archive", &format!("Failed to archive: {}", e), task_name, Some(status_before), None);
     }
 
-    ActionResponse {
-        action: "archive".to_string(),
-        success: true,
-        error: None,
-        task: Some(TaskInfo {
-            name: task_name.to_string(),
-            status: None,
-            status_before: Some(status_before),
-            status_after: Some(TaskStatus::Archived),
-            tmux_alive: None,
-        }),
-        available_actions: None,
-        unavailable_actions: None,
-        command: None,
-    }
+    success_response("archive", task_name, status_before, TaskStatus::Archived)
 }
 
 fn handle_enter_action(app: &App, task_name: &str) -> ActionResponse {
@@ -437,20 +352,6 @@ fn handle_tail_action(task_name: &str) -> ActionResponse {
             // tail::execute already printed output, exit without additional JSON
             std::process::exit(0);
         }
-        Err(e) => ActionResponse {
-            action: "tail".to_string(),
-            success: false,
-            error: Some(format!("Failed to tail: {}", e)),
-            task: Some(TaskInfo {
-                name: task_name.to_string(),
-                status: None,
-                status_before: None,
-                status_after: None,
-                tmux_alive: None,
-            }),
-            available_actions: None,
-            unavailable_actions: None,
-            command: None,
-        },
+        Err(e) => error_response("tail", &format!("Failed to tail: {}", e), task_name, None, None),
     }
 }
