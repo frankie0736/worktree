@@ -42,6 +42,9 @@ pub struct TaskDisplay {
     pub tmux_session: Option<String>,
     pub tmux_window: Option<String>,
     pub session_id: Option<String>,
+    pub commit_count: i32,
+    pub has_conflict: bool,
+    pub current_tool: Option<String>,
 }
 
 /// Application state
@@ -98,11 +101,19 @@ impl App {
             };
 
             // Parse transcript for metrics (duration, context, etc.)
+            // Try session_id first, fall back to finding latest transcript
             let transcript_metrics = instance.and_then(|inst| {
-                inst.session_id
+                // First try with saved session_id
+                let path_from_id = inst
+                    .session_id
                     .as_ref()
                     .and_then(|sid| transcript::transcript_path(&inst.worktree_path, sid))
-                    .and_then(|path| transcript::parse_transcript(&path))
+                    .filter(|p| p.exists());
+
+                // Fall back to finding latest transcript if session_id doesn't match
+                let path = path_from_id.or_else(|| transcript::find_latest_transcript(&inst.worktree_path));
+
+                path.and_then(|p| transcript::parse_transcript(&p))
             });
 
             // Duration from transcript timestamps
@@ -137,6 +148,23 @@ impl App {
                 .map(|m| m.context_percent())
                 .unwrap_or(0);
 
+            // Current tool from transcript
+            let current_tool = transcript_metrics
+                .as_ref()
+                .and_then(|m| m.current_tool.clone());
+
+            // Commit count and conflict status
+            let (commit_count, has_conflict) = worktree_path
+                .as_deref()
+                .map(|path| {
+                    let count = git::get_commit_count(path, "main")
+                        .or_else(|| git::get_commit_count(path, "master"))
+                        .unwrap_or(0);
+                    let conflict = git::has_conflicts(path);
+                    (count, conflict)
+                })
+                .unwrap_or((0, false));
+
             // Get tmux and session info
             let (tmux_session, tmux_window, session_id) = instance
                 .map(|i| {
@@ -161,6 +189,9 @@ impl App {
                 tmux_session,
                 tmux_window,
                 session_id,
+                commit_count,
+                has_conflict,
+                current_tool,
             });
         }
 

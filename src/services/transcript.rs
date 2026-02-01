@@ -26,6 +26,8 @@ pub struct TranscriptMetrics {
     pub started_at: Option<chrono::DateTime<chrono::Utc>>,
     /// Session end timestamp (from last entry)
     pub finished_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// Current tool being used (last tool_use)
+    pub current_tool: Option<String>,
 }
 
 impl TranscriptMetrics {
@@ -67,6 +69,33 @@ pub fn transcript_path(worktree_path: &str, session_id: &str) -> Option<PathBuf>
     Some(projects_dir.join(dir_name).join(format!("{}.jsonl", session_id)))
 }
 
+/// Find the most recent transcript file for a worktree.
+/// This is more reliable than using our generated session_id since Claude
+/// generates its own session IDs.
+pub fn find_latest_transcript(worktree_path: &str) -> Option<PathBuf> {
+    let projects_dir = claude_projects_dir()?;
+    let dir_name = project_dir_name(worktree_path);
+    let project_dir = projects_dir.join(dir_name);
+
+    if !project_dir.exists() {
+        return None;
+    }
+
+    // Find all .jsonl files and get the most recently modified one
+    std::fs::read_dir(&project_dir)
+        .ok()?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| {
+            entry
+                .path()
+                .extension()
+                .map(|ext| ext == "jsonl")
+                .unwrap_or(false)
+        })
+        .max_by_key(|entry| entry.metadata().ok().and_then(|m| m.modified().ok()))
+        .map(|entry| entry.path())
+}
+
 /// Parse a transcript file and extract metrics.
 pub fn parse_transcript(path: &Path) -> Option<TranscriptMetrics> {
     let file = File::open(path).ok()?;
@@ -82,6 +111,7 @@ pub fn parse_transcript(path: &Path) -> Option<TranscriptMetrics> {
     let mut last_assistant_text: Option<String> = None;
     let mut first_timestamp: Option<chrono::DateTime<chrono::Utc>> = None;
     let mut last_timestamp: Option<chrono::DateTime<chrono::Utc>> = None;
+    let mut last_tool: Option<String> = None;
 
     for line in reader.lines() {
         let line = line.ok()?;
@@ -111,12 +141,16 @@ pub fn parse_transcript(path: &Path) -> Option<TranscriptMetrics> {
                             total_output += usage.output_tokens.unwrap_or(0);
                         }
 
-                        // Extract text content for summary
+                        // Extract text content for summary and tool usage
                         if let Some(content) = msg.content {
                             for item in content {
                                 if item.r#type == "text" {
                                     if let Some(text) = item.text {
                                         last_assistant_text = Some(text);
+                                    }
+                                } else if item.r#type == "tool_use" {
+                                    if let Some(name) = &item.name {
+                                        last_tool = Some(name.clone());
                                     }
                                 }
                             }
@@ -144,6 +178,7 @@ pub fn parse_transcript(path: &Path) -> Option<TranscriptMetrics> {
     metrics.completed = turn_count > 0; // Consider completed if there's at least one turn
     metrics.started_at = first_timestamp;
     metrics.finished_at = last_timestamp;
+    metrics.current_tool = last_tool;
 
     Some(metrics)
 }
@@ -183,6 +218,8 @@ struct ContentItem {
     text: Option<String>,
     #[serde(default)]
     thinking: Option<String>,
+    #[serde(default)]
+    name: Option<String>,
 }
 
 /// Get the last N assistant messages from a transcript.

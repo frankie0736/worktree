@@ -17,17 +17,27 @@ struct TaskMetrics {
     #[serde(skip_serializing_if = "Option::is_none")]
     duration_human: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    context_percent: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    current_tool: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     additions: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     deletions: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     commits: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    has_conflict: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     idle_secs: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     active: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tmux_alive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    session_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    transcript_exists: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -97,7 +107,6 @@ fn handle_tui_action(action: crate::tui::TuiAction) -> Result<()> {
 
 fn display_status(json: bool) -> Result<()> {
     let mut store = TaskStore::load()?;
-    let config = WtConfig::load().ok();
 
     let mut metrics_list = Vec::new();
     let mut running_count = 0;
@@ -138,13 +147,25 @@ fn display_status(json: bool) -> Result<()> {
         let instance = store.get_instance(task.name());
         let worktree_path = instance.map(|i| i.worktree_path.as_str());
 
-        // Parse transcript for duration
-        let transcript_metrics = instance.and_then(|inst| {
-            inst.session_id
+        // Get session_id and transcript path info
+        let session_id = instance.and_then(|i| i.session_id.clone());
+
+        // Try session_id first, fall back to finding latest transcript
+        let transcript_path_opt = instance.and_then(|inst| {
+            let path_from_id = inst
+                .session_id
                 .as_ref()
                 .and_then(|sid| transcript::transcript_path(&inst.worktree_path, sid))
-                .and_then(|path| transcript::parse_transcript(&path))
+                .filter(|p| p.exists());
+
+            path_from_id.or_else(|| transcript::find_latest_transcript(&inst.worktree_path))
         });
+        let transcript_exists = transcript_path_opt.as_ref().map(|p| p.exists());
+
+        // Parse transcript for metrics
+        let transcript_metrics = transcript_path_opt
+            .as_ref()
+            .and_then(|path| transcript::parse_transcript(path));
 
         // Duration from transcript timestamps
         let (duration_secs, duration_human) = transcript_metrics
@@ -152,6 +173,10 @@ fn display_status(json: bool) -> Result<()> {
             .and_then(|m| m.duration_secs())
             .map(|secs| (Some(secs), Some(format_duration(secs))))
             .unwrap_or((None, None));
+
+        // Context percent and current tool from transcript
+        let context_percent = transcript_metrics.as_ref().map(|m| m.context_percent());
+        let current_tool = transcript_metrics.as_ref().and_then(|m| m.current_tool.clone());
 
         // Get diff stats
         let (additions, deletions) = worktree_path
@@ -161,11 +186,12 @@ fn display_status(json: bool) -> Result<()> {
         total_additions += additions;
         total_deletions += deletions;
 
-        // Get commit count
-        let commits = worktree_path
-            .and_then(|p| {
-                config.as_ref().and_then(|_| git::get_commit_count(p, "HEAD~100"))
-            });
+        // Get commit count and conflict status
+        let commits = worktree_path.and_then(|p| {
+            git::get_commit_count(p, "main")
+                .or_else(|| git::get_commit_count(p, "master"))
+        });
+        let has_conflict = worktree_path.map(git::has_conflicts);
 
         // tmux_alive for JSON output (only meaningful for running tasks)
         let tmux_alive_for_output = if final_status == TaskStatus::Running {
@@ -195,12 +221,17 @@ fn display_status(json: bool) -> Result<()> {
             status: final_status,
             duration_secs,
             duration_human,
+            context_percent,
+            current_tool,
             additions: if additions > 0 { Some(additions) } else { None },
             deletions: if deletions > 0 { Some(deletions) } else { None },
             commits,
+            has_conflict,
             idle_secs,
             active,
             tmux_alive: tmux_alive_for_output,
+            session_id,
+            transcript_exists,
         });
     }
 

@@ -27,6 +27,19 @@ pub fn branch_exists(branch: &str) -> bool {
     CommandRunner::git().success(&["show-ref", "--verify", "--quiet", &format!("refs/heads/{}", branch)])
 }
 
+/// Find branches matching a pattern (e.g., "wt/task-*")
+pub fn find_branches(pattern: &str) -> Vec<String> {
+    let output = CommandRunner::git().output(&["branch", "--list", pattern]);
+    match output {
+        Ok(stdout) => stdout
+            .lines()
+            .map(|line| line.trim().trim_start_matches("* ").to_string())
+            .filter(|s| !s.is_empty())
+            .collect(),
+        Err(_) => Vec::new(),
+    }
+}
+
 /// Get diff stats (additions, deletions) for a worktree compared to main branch.
 /// Shows all changes on the branch, including committed ones.
 pub fn get_diff_stats(worktree_path: &str) -> Option<(i32, i32)> {
@@ -107,6 +120,31 @@ pub fn get_commit_count(worktree_path: &str, base_branch: &str) -> Option<i32> {
         stdout.trim().parse().ok()
     } else {
         None
+    }
+}
+
+/// Check if the worktree has merge conflicts.
+pub fn has_conflicts(worktree_path: &str) -> bool {
+    // Check for unmerged files via git status
+    let output = CommandRunner::new("git")
+        .current_dir(worktree_path)
+        .output(&["status", "--porcelain"]);
+
+    if let Ok(stdout) = output {
+        // Unmerged files have status like "UU", "AA", "DD", etc.
+        stdout.lines().any(|line| {
+            let chars: Vec<char> = line.chars().collect();
+            if chars.len() >= 2 {
+                let x = chars[0];
+                let y = chars[1];
+                // Unmerged statuses
+                matches!((x, y), ('U', _) | (_, 'U') | ('A', 'A') | ('D', 'D'))
+            } else {
+                false
+            }
+        })
+    } else {
+        false
     }
 }
 

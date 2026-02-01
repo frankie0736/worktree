@@ -28,10 +28,6 @@ pub fn kill_window(session: &str, window: &str) -> Result<()> {
     CommandRunner::tmux().run(&["kill-window", "-t", &target])
 }
 
-pub fn kill_session(session: &str) -> Result<()> {
-    CommandRunner::tmux().run(&["kill-session", "-t", session])
-}
-
 pub fn window_exists(session: &str, window: &str) -> bool {
     let target = format!("{}:{}", session, window);
     CommandRunner::tmux().success(&["select-window", "-t", &target])

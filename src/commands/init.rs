@@ -62,6 +62,14 @@ tmux_session: {}
 #   - .env
 #   - .env.local
 
+# 归档/重置前的清理脚本
+# 用于删除大文件（node_modules 等），减少备份体积
+# archive_script: |
+#   rm -rf node_modules/
+#   rm -rf dist/
+#   rm -rf .next/
+#   rm -rf target/
+
 # ============================================
 # 日志配置 (wt logs)
 # ============================================
@@ -228,6 +236,13 @@ mod tests {
     fn test_generate_config_has_template_variables() {
         let config = generate_config("test");
         assert!(config.contains("${task}"));
+    }
+
+    #[test]
+    fn test_generate_config_has_archive_script() {
+        let config = generate_config("test");
+        assert!(config.contains("archive_script:"));
+        assert!(config.contains("node_modules"));
     }
 
     #[test]

@@ -98,13 +98,17 @@ fn format_task_line(task: &TaskDisplay, selected: bool, _width: usize) -> Line<'
         spans.push(Span::raw("   "));
     }
 
-    // Status icon with color
-    let (icon, icon_color) = get_status_icon(task);
+    // Status icon with color (conflict overrides normal status)
+    let (icon, icon_color) = if task.has_conflict {
+        ("⚠", Color::Red)
+    } else {
+        get_status_icon(task)
+    };
     spans.push(Span::styled(icon, Style::default().fg(icon_color)));
     spans.push(Span::raw(" "));
 
     // Task name (fixed width)
-    let name = format!("{:<14}", truncate(&task.name, 14));
+    let name = format!("{:<12}", truncate(&task.name, 12));
     let name_style = if selected {
         Style::default().fg(Color::White).bold()
     } else {
@@ -112,35 +116,84 @@ fn format_task_line(task: &TaskDisplay, selected: bool, _width: usize) -> Line<'
     };
     spans.push(Span::styled(name, name_style));
 
-    // Duration or "done"
+    // Duration
     let duration = task
         .duration
         .as_ref()
         .map(|d| format!("{:>6}", d))
-        .unwrap_or_else(|| "  done".to_string());
-    spans.push(Span::styled(
-        format!("   {}", duration),
-        Style::default().fg(Color::DarkGray),
-    ));
+        .unwrap_or_else(|| "     -".to_string());
+    spans.push(Span::styled(duration, Style::default().fg(Color::DarkGray)));
 
-    // Context bar
-    spans.push(Span::raw("   "));
-    spans.extend(render_context_bar(task.context_percent));
+    // Context percent (colored by usage level)
+    let ctx_color = if task.context_percent >= 95 {
+        Color::Red
+    } else if task.context_percent >= 80 {
+        Color::Yellow
+    } else {
+        Color::Cyan
+    };
     spans.push(Span::styled(
         format!(" {:>3}%", task.context_percent),
-        Style::default().fg(Color::DarkGray),
+        Style::default().fg(ctx_color),
     ));
 
-    // Changes
-    let changes = format!("   {:>+5} {:>-5}", task.additions, format!("-{}", task.deletions));
+    // Commit count
+    let commit_str = if task.commit_count > 0 {
+        format!(" {:>2}c", task.commit_count)
+    } else {
+        "   -".to_string()
+    };
+    spans.push(Span::styled(commit_str, Style::default().fg(Color::Magenta)));
+
+    // Changes (compact format)
+    let changes = if task.additions > 0 || task.deletions > 0 {
+        format!(" +{}/-{}", task.additions, task.deletions)
+    } else {
+        " -".to_string()
+    };
     let changes_color = if task.additions > 0 || task.deletions > 0 {
         Color::Gray
     } else {
         Color::DarkGray
     };
-    spans.push(Span::styled(changes, Style::default().fg(changes_color)));
+    spans.push(Span::styled(format!("{:<12}", changes), Style::default().fg(changes_color)));
+
+    // Conflict or current tool
+    if task.has_conflict {
+        spans.push(Span::styled(" ⚡CONFLICT", Style::default().fg(Color::Red).bold()));
+    } else if let Some(tool) = &task.current_tool {
+        let tool_display = format_tool_name(tool);
+        spans.push(Span::styled(
+            format!(" {}", tool_display),
+            Style::default().fg(Color::DarkGray),
+        ));
+    }
 
     Line::from(spans)
+}
+
+fn format_tool_name(tool: &str) -> String {
+    // Shorten common tool names for display
+    let short = match tool {
+        "Read" => "Read",
+        "Write" => "Write",
+        "Edit" => "Edit",
+        "Bash" => "Bash",
+        "Glob" => "Glob",
+        "Grep" => "Grep",
+        "Task" => "Task",
+        "WebFetch" => "Web",
+        "WebSearch" => "Search",
+        other => {
+            // Handle MCP tools like mcp__server__tool
+            if other.starts_with("mcp__") {
+                other.rsplit("__").next().unwrap_or(other)
+            } else {
+                other
+            }
+        }
+    };
+    truncate(short, 12)
 }
 
 fn get_status_icon(task: &TaskDisplay) -> (&'static str, Color) {
@@ -158,24 +211,6 @@ fn get_status_icon(task: &TaskDisplay) -> (&'static str, Color) {
         }
         _ => ("○", Color::DarkGray),
     }
-}
-
-fn render_context_bar(percent: u8) -> Vec<Span<'static>> {
-    let filled = (percent as usize * 10) / 100;
-    let empty = 10 - filled;
-
-    let bar_color = if percent >= 95 {
-        Color::Red
-    } else if percent >= 80 {
-        Color::Yellow
-    } else {
-        Color::Cyan
-    };
-
-    vec![
-        Span::styled("▰".repeat(filled), Style::default().fg(bar_color)),
-        Span::styled("▱".repeat(empty), Style::default().fg(Color::DarkGray)),
-    ]
 }
 
 fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {

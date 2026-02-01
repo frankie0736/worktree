@@ -76,9 +76,6 @@ pub enum WtError {
     #[error("Task '{0}': transcript not found")]
     TranscriptNotFound(String),
 
-    #[error("Task '{0}': no session ID (started with older wt version)")]
-    NoSessionId(String),
-
     #[error("Task '{0}': failed to parse transcript")]
     TranscriptParseFailed(String),
 

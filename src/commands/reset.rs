@@ -1,3 +1,4 @@
+use std::env;
 use std::fs;
 use std::path::Path;
 
@@ -19,23 +20,19 @@ pub fn execute(name: String) -> Result<()> {
 
     let current_status = store.get_status(&name);
 
-    // If already Pending, silently succeed (idempotent)
-    if current_status == TaskStatus::Pending {
-        println!("Task '{}' is already pending.", name);
-        return Ok(());
-    }
-
-    // Check for non-pending dependents (exclude Archived from blocking)
-    let dependents: Vec<_> = dependency::find_non_pending_dependents(&store, &name)
-        .into_iter()
-        .filter(|(_, status)| *status != TaskStatus::Archived)
-        .collect();
-    if let Some((dep_name, dep_status)) = dependents.first() {
-        return Err(WtError::HasDependents {
-            task: name.clone(),
-            dependent: dep_name.clone(),
-            status: dep_status.display_name().to_string(),
-        });
+    // Check for non-pending dependents (exclude Archived and Pending from blocking)
+    if current_status != TaskStatus::Pending {
+        let dependents: Vec<_> = dependency::find_non_pending_dependents(&store, &name)
+            .into_iter()
+            .filter(|(_, status)| *status != TaskStatus::Archived)
+            .collect();
+        if let Some((dep_name, dep_status)) = dependents.first() {
+            return Err(WtError::HasDependents {
+                task: name.clone(),
+                dependent: dep_name.clone(),
+                status: dep_status.display_name().to_string(),
+            });
+        }
     }
 
     // Backup and cleanup resources if instance exists
@@ -79,6 +76,16 @@ pub fn execute(name: String) -> Result<()> {
         } else {
             println!("  Deleted branch: {}", instance.branch);
         }
+    } else {
+        // No instance saved, but there might be orphaned resources from a failed start
+        // Try to clean up based on expected paths
+        let cleaned = cleanup_orphaned_resources(&name, &config)?;
+
+        // If already pending and nothing to clean, just report
+        if current_status == TaskStatus::Pending && !cleaned {
+            println!("Task '{}' is already pending.", name);
+            return Ok(());
+        }
     }
 
     // Update status to Pending and clear instance
@@ -88,6 +95,46 @@ pub fn execute(name: String) -> Result<()> {
 
     println!("Task '{}' reset to pending.", name);
     Ok(())
+}
+
+/// Clean up orphaned resources from a failed start (no instance saved)
+/// Returns true if any resources were cleaned up
+fn cleanup_orphaned_resources(task_name: &str, config: &WtConfig) -> Result<bool> {
+    let cwd = env::current_dir().map_err(|e| WtError::Git(e.to_string()))?;
+    let worktree_path = cwd
+        .join(&config.worktree_dir)
+        .join(task_name)
+        .to_string_lossy()
+        .to_string();
+
+    let worktree_exists = Path::new(&worktree_path).exists();
+    let branches = git::find_branches(&format!("wt/{}-*", task_name));
+
+    if !worktree_exists && branches.is_empty() {
+        return Ok(false); // Nothing to clean up
+    }
+
+    println!("Cleaning up orphaned resources...");
+
+    // Remove worktree if exists
+    if worktree_exists {
+        if let Err(e) = git::remove_worktree(&worktree_path) {
+            eprintln!("  Warning: Failed to remove worktree: {}", e);
+        } else {
+            println!("  Removed worktree: {}", worktree_path);
+        }
+    }
+
+    // Delete any matching branches
+    for branch in branches {
+        if let Err(e) = git::delete_branch(&branch) {
+            eprintln!("  Warning: Failed to delete branch {}: {}", branch, e);
+        } else {
+            println!("  Deleted branch: {}", branch);
+        }
+    }
+
+    Ok(true)
 }
 
 fn backup_worktree(task_name: &str, worktree_path: &str) -> Result<()> {

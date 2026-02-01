@@ -28,24 +28,27 @@ pub fn execute() -> Result<()> {
             }
         };
 
-        // Need session_id
-        let session_id = match &instance.session_id {
-            Some(id) => id,
+        // Find transcript file - try session_id first, fall back to latest
+        let transcript_path = instance
+            .session_id
+            .as_ref()
+            .and_then(|sid| transcript::transcript_path(&instance.worktree_path, sid))
+            .filter(|p| p.exists())
+            .or_else(|| transcript::find_latest_transcript(&instance.worktree_path));
+
+        let transcript_path = match transcript_path {
+            Some(p) => p,
             None => {
                 skipped += 1;
                 continue;
             }
         };
 
-        // Find transcript file
-        let transcript_path = match transcript::transcript_path(&instance.worktree_path, session_id)
-        {
-            Some(p) if p.exists() => p,
-            _ => {
-                skipped += 1;
-                continue;
-            }
-        };
+        // Extract session_id from transcript path for log naming
+        let session_id = transcript_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown");
 
         // Generate log file
         let log_path = transcript::log_path(task.name(), session_id);
