@@ -27,17 +27,47 @@ pub fn branch_exists(branch: &str) -> bool {
     CommandRunner::git().success(&["show-ref", "--verify", "--quiet", &format!("refs/heads/{}", branch)])
 }
 
-/// Get diff stats (additions, deletions) for a worktree compared to its base branch.
+/// Get diff stats (additions, deletions) for a worktree compared to main branch.
+/// Shows all changes on the branch, including committed ones.
 pub fn get_diff_stats(worktree_path: &str) -> Option<(i32, i32)> {
+    // Try to find the base branch (main or master)
+    let base = get_default_branch(worktree_path).unwrap_or_else(|| "main".to_string());
+
+    // Use merge-base to find common ancestor, then diff from there
     let output = CommandRunner::new("git")
         .current_dir(worktree_path)
-        .output(&["diff", "--shortstat", "HEAD"]);
+        .output(&["diff", "--shortstat", &format!("{}...HEAD", base)]);
 
     if let Ok(stdout) = output {
         parse_diff_stats(&stdout)
     } else {
-        None
+        // Fallback to uncommitted changes only
+        let output = CommandRunner::new("git")
+            .current_dir(worktree_path)
+            .output(&["diff", "--shortstat", "HEAD"]);
+        output.ok().and_then(|s| parse_diff_stats(&s))
     }
+}
+
+/// Get the default branch name (main or master)
+fn get_default_branch(worktree_path: &str) -> Option<String> {
+    // Try main first
+    let result = CommandRunner::new("git")
+        .current_dir(worktree_path)
+        .success(&["rev-parse", "--verify", "main"]);
+    if result {
+        return Some("main".to_string());
+    }
+
+    // Try master
+    let result = CommandRunner::new("git")
+        .current_dir(worktree_path)
+        .success(&["rev-parse", "--verify", "master"]);
+    if result {
+        return Some("master".to_string());
+    }
+
+    None
 }
 
 /// Parse git diff --shortstat output like "3 files changed, 10 insertions(+), 5 deletions(-)"

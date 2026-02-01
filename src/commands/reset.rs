@@ -1,7 +1,3 @@
-use std::fs;
-use std::path::Path;
-
-use crate::constants::log_path;
 use crate::error::{Result, WtError};
 use crate::models::{TaskStatus, TaskStore};
 use crate::services::{dependency, git, tmux};
@@ -55,16 +51,6 @@ pub fn execute(name: String) -> Result<()> {
             eprintln!("  Warning: Failed to delete branch: {}", e);
         } else {
             println!("  Deleted branch: {}", instance.branch);
-        }
-    }
-
-    // Delete log file if exists
-    let log_file = log_path(&name);
-    if Path::new(&log_file).exists() {
-        if let Err(e) = fs::remove_file(&log_file) {
-            eprintln!("  Warning: Failed to delete log file: {}", e);
-        } else {
-            println!("  Deleted log: {}", log_file);
         }
     }
 

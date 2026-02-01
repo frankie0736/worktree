@@ -18,19 +18,8 @@ pub const BRANCH_PREFIX: &str = "wt/";
 /// Status file for runtime state
 pub const STATUS_FILE: &str = ".wt/status.json";
 
-/// Logs directory for agent output
-pub const LOGS_DIR: &str = ".wt/logs";
-
 /// Idle threshold in seconds (for status command)
 pub const IDLE_THRESHOLD_SECS: u64 = 120;
-
-/// Watch interval in seconds (for status --watch)
-pub const WATCH_INTERVAL_SECS: u64 = 2;
-
-/// Generate log file path from task name
-pub fn log_path(task_name: &str) -> String {
-    format!("{}/{}.jsonl", LOGS_DIR, task_name)
-}
 
 /// Generate branch name from task name
 pub fn branch_name(task_name: &str) -> String {

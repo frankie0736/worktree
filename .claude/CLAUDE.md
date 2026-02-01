@@ -17,7 +17,7 @@ src/
 ├── display.rs        # 显示格式化 (format_duration 等)
 ├── error.rs          # 错误类型 (WtError)
 ├── models/
-│   ├── task.rs       # Task, TaskStatus, TaskInput, TaskFrontmatter
+│   ├── task.rs       # Task, TaskStatus, TaskInput, Instance
 │   ├── status.rs     # StatusStore, TaskState (运行时状态)
 │   ├── store.rs      # TaskStore (加载任务 + 状态)
 │   └── config.rs     # WtConfig (.wt.yaml 解析)
@@ -32,21 +32,26 @@ src/
 │   ├── merged.rs
 │   ├── reset.rs
 │   ├── status.rs
-│   ├── cleanup.rs
-│   └── enter.rs
-└── services/
-    ├── command.rs    # 命令执行辅助 (CommandRunner)
-    ├── git.rs        # git worktree 操作
-    ├── tmux.rs       # tmux session/window 操作
-    ├── workspace.rs  # worktree 初始化 (WorkspaceInitializer)
-    └── dependency.rs # 依赖检查
+│   ├── review.rs
+│   └── cleanup.rs
+├── services/
+│   ├── command.rs    # 命令执行辅助 (CommandRunner)
+│   ├── git.rs        # git worktree 操作
+│   ├── tmux.rs       # tmux session/window 操作
+│   ├── workspace.rs  # worktree 初始化 (WorkspaceInitializer)
+│   ├── transcript.rs # Claude transcript 解析
+│   └── dependency.rs # 依赖检查
+└── tui/
+    ├── mod.rs        # TUI 入口和事件处理
+    ├── app.rs        # TUI 应用状态
+    └── ui.rs         # TUI 渲染
 ```
 
 ## 核心概念
 
 ### Task（任务）
 
-**定义**存储在 `.wt/tasks/*.md`（Git 追踪）：
+**定义**存储在 `.wt/tasks/*.md`：
 
 ```yaml
 name: auth          # 任务名（= 文件名，= git 分支名 wt/<name>）
@@ -54,7 +59,7 @@ depends:            # 依赖的任务列表
   - database
 ```
 
-**状态**存储在 `.wt/status.json`（Git 忽略）：
+**状态**存储在 `.wt/status.json`：
 
 ```json
 {
@@ -103,3 +108,5 @@ cargo install --path .   # 安装到 ~/.cargo/bin
 - @.claude/rules/rust-style.md - Rust 编码规范
 - @.claude/rules/testing.md - 测试指南
 - @.claude/rules/cli/commands.md - CLI 命令实现规范
+- @.claude/specs/wt-review.md - review 命令规格
+- @.claude/specs/directory-restructure.md - 目录重构规格（待实现）

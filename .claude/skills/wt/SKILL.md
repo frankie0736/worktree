@@ -34,26 +34,38 @@ wt next
 # 启动任务
 wt start <name>
 
+# 查看状态 (TUI)
+wt status
+
+# 查看状态 (JSON，给 agent 用)
+wt status --json
+
+# 查看任务结果
+wt review <name>
+
 # 标记完成
 wt done <name>
 
 # 标记已合并
 wt merged <name>
 
-# 清理资源
-wt cleanup [--all]
-
-# 查看运行中任务状态
-wt status              # 普通视图
-wt status --watch      # 持续监控
-wt status --json       # JSON 输出
-
 # 重置任务到 pending
 wt reset <name>
 
-# 进入 tmux 查看 agent
-wt enter [task]
+# 清理资源
+wt cleanup [--all]
 ```
+
+## Status TUI 快捷键
+
+| 按键 | 功能 |
+|------|------|
+| `↑↓` / `jk` | 导航 |
+| `Enter` | 进入 worktree 目录 |
+| `r` | review (Done 任务) |
+| `d` | 标记 done (agent 已退出) |
+| `m` | 标记 merged |
+| `q` | 退出 |
 
 ## JSON 格式
 

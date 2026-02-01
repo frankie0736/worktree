@@ -32,9 +32,6 @@ pub enum WtError {
     #[error("Task '{0}' is already running")]
     AlreadyRunning(String),
 
-    #[error("Task '{0}' is not running")]
-    TaskNotRunning(String),
-
     #[error("Branch '{0}' already exists.\nHint: Run `git branch -D {0}` to delete it, then retry.")]
     BranchExists(String),
 
@@ -69,6 +66,21 @@ pub enum WtError {
         dependent: String,
         status: String,
     },
+
+    #[error("Cannot review task '{0}': task is still running")]
+    CannotReviewRunning(String),
+
+    #[error("Cannot review task '{0}': worktree no longer exists")]
+    WorktreeNotFound(String),
+
+    #[error("Cannot review task '{0}': session transcript not found")]
+    TranscriptNotFound(String),
+
+    #[error("Cannot review task '{0}': task has no session ID (started with older wt version)")]
+    NoSessionId(String),
+
+    #[error("Task '{0}' is not in Done state")]
+    TaskNotDone(String),
 }
 
 pub type Result<T> = std::result::Result<T, WtError>;

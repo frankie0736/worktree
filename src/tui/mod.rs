@@ -3,7 +3,7 @@
 mod app;
 mod ui;
 
-pub use app::App;
+pub use app::{App, TuiAction};
 
 use std::io;
 use std::time::Duration;
@@ -17,8 +17,8 @@ use ratatui::prelude::*;
 
 use crate::error::Result;
 
-/// Run the TUI application
-pub fn run() -> Result<()> {
+/// Run the TUI application and return the action to perform
+pub fn run() -> Result<TuiAction> {
     // Setup terminal
     enable_raw_mode().map_err(|e| crate::error::WtError::Io {
         operation: "enable raw mode".to_string(),
@@ -59,7 +59,7 @@ pub fn run() -> Result<()> {
     result
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> {
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<TuiAction> {
     let tick_rate = Duration::from_secs(2);
 
     loop {
@@ -84,17 +84,43 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<()> 
             })? {
                 if key.kind == KeyEventKind::Press {
                     match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                        // Quit
+                        KeyCode::Char('q') | KeyCode::Esc => {
+                            return Ok(TuiAction::Quit);
+                        }
+
+                        // Navigate
                         KeyCode::Up | KeyCode::Char('k') => app.previous(),
                         KeyCode::Down | KeyCode::Char('j') => app.next(),
-                        KeyCode::Enter | KeyCode::Char('e') => {
-                            if let Err(e) = app.enter_selected() {
-                                // Exit TUI to show error
-                                return Err(e);
+
+                        // Enter worktree
+                        KeyCode::Enter => {
+                            if let Some(action) = app.enter_worktree_action() {
+                                return Ok(action);
                             }
-                            // After entering tmux, we exit the TUI
-                            return Ok(());
                         }
+
+                        // Review (Done only)
+                        KeyCode::Char('r') => {
+                            if let Some(action) = app.review_action() {
+                                return Ok(action);
+                            }
+                        }
+
+                        // Mark as done (Running + tmux exited)
+                        KeyCode::Char('d') => {
+                            if app.can_mark_done() {
+                                app.mark_done()?;
+                            }
+                        }
+
+                        // Mark as merged (Done only)
+                        KeyCode::Char('m') => {
+                            if app.can_mark_merged() {
+                                app.mark_merged()?;
+                            }
+                        }
+
                         _ => {}
                     }
                 }

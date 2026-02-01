@@ -70,26 +70,26 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Enter tmux session to view/interact with agents
-    Enter {
-        /// Task name to jump to (optional, enters session if omitted)
-        name: Option<String>,
-    },
-
     /// Reset a task to pending state (cleanup resources)
     Reset {
         /// Task name to reset
         name: String,
     },
 
-    /// Show status of running/done tasks with metrics
+    /// Show status of running/done tasks (TUI by default, --json for programmatic use)
     Status {
+        /// Output as JSON for programmatic use (non-interactive)
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Review task results and optionally continue conversation
+    Review {
+        /// Task name to review
+        name: String,
+
         /// Output as JSON for programmatic use
         #[arg(long)]
         json: bool,
-
-        /// Watch mode: continuously refresh status
-        #[arg(long)]
-        watch: bool,
     },
 }

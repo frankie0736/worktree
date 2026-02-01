@@ -22,7 +22,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     draw_header(frame, chunks[0], app);
     draw_tasks(frame, chunks[1], app);
-    draw_footer(frame, chunks[2]);
+    draw_footer(frame, chunks[2], app);
 }
 
 fn draw_header(frame: &mut Frame, area: Rect, app: &App) {
@@ -168,7 +168,7 @@ fn render_context_bar(percent: u8) -> Vec<Span<'static>> {
     ]
 }
 
-fn draw_footer(frame: &mut Frame, area: Rect) {
+fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
     // Separator
     let sep = "─".repeat(area.width as usize);
     frame.render_widget(
@@ -176,19 +176,37 @@ fn draw_footer(frame: &mut Frame, area: Rect) {
         Rect::new(area.x, area.y, area.width, 1),
     );
 
-    // Keybindings
+    // Keybindings - context sensitive
     if area.height > 1 {
         let help_area = Rect::new(area.x, area.y + 1, area.width, 1);
-        let help = Line::from(vec![
+
+        let mut spans = vec![
             Span::raw(" "),
             Span::styled("↑↓", Style::default().fg(Color::Yellow)),
-            Span::raw(" navigate   "),
-            Span::styled("e", Style::default().fg(Color::Yellow)),
-            Span::raw(" enter   "),
-            Span::styled("q", Style::default().fg(Color::Yellow)),
-            Span::raw(" quit"),
-        ]);
-        frame.render_widget(Paragraph::new(help), help_area);
+            Span::raw(" navigate  "),
+            Span::styled("⏎", Style::default().fg(Color::Yellow)),
+            Span::raw(" cd  "),
+        ];
+
+        // Context-sensitive actions based on selected task
+        if let Some(task) = app.selected_task() {
+            if task.status == TaskStatus::Done {
+                // Done: r (review), m (merged)
+                spans.push(Span::styled("r", Style::default().fg(Color::Yellow)));
+                spans.push(Span::raw(" review  "));
+                spans.push(Span::styled("m", Style::default().fg(Color::Yellow)));
+                spans.push(Span::raw(" merged  "));
+            } else if task.status == TaskStatus::Running && !task.tmux_alive {
+                // Running but tmux exited: d (done)
+                spans.push(Span::styled("d", Style::default().fg(Color::Yellow)));
+                spans.push(Span::raw(" done  "));
+            }
+        }
+
+        spans.push(Span::styled("q", Style::default().fg(Color::Yellow)));
+        spans.push(Span::raw(" quit"));
+
+        frame.render_widget(Paragraph::new(Line::from(spans)), help_area);
     }
 }
 

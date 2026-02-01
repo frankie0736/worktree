@@ -23,9 +23,9 @@ fn main() {
         Commands::Merged { name } => commands::merged::execute(name),
         Commands::Cleanup { all } => commands::cleanup::execute(all),
         Commands::Next { json } => commands::next::execute(json),
-        Commands::Enter { name } => commands::enter::execute(name),
         Commands::Reset { name } => commands::reset::execute(name),
-        Commands::Status { json, watch } => commands::status::execute(json, watch),
+        Commands::Status { json } => commands::status::execute(json),
+        Commands::Review { name, json } => commands::review::execute(name, json),
     };
 
     if let Err(e) = result {

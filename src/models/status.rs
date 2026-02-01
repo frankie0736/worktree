@@ -149,7 +149,7 @@ mod tests {
             worktree_path: "/path".to_string(),
             tmux_session: "wt".to_string(),
             tmux_window: "test".to_string(),
-            started_at: None,
+            session_id: None,
         };
         store.set_instance("test", Some(instance.clone()));
 

@@ -1,15 +1,12 @@
-use std::io::{self, Write};
-use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
-use chrono::Utc;
 use serde::Serialize;
 
-use crate::constants::{IDLE_THRESHOLD_SECS, WATCH_INTERVAL_SECS};
+use crate::constants::IDLE_THRESHOLD_SECS;
 use crate::display::format_duration;
 use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore, WtConfig};
-use crate::services::{git, tmux};
+use crate::services::{git, tmux, transcript};
 
 #[derive(Serialize)]
 struct TaskMetrics {
@@ -47,40 +44,41 @@ struct StatusSummary {
     total_deletions: i32,
 }
 
-pub fn execute(json: bool, watch: bool) -> Result<()> {
+pub fn execute(json: bool) -> Result<()> {
     // Verify we're in a wt project directory
     WtConfig::load()?;
 
-    if watch {
-        if json {
-            // JSON watch mode uses simple refresh
-            run_watch_mode(json)
-        } else {
-            // Interactive TUI mode
-            crate::tui::run()
-        }
+    if json {
+        // JSON output for agents/scripts
+        display_status(true)
+    } else if atty::is(atty::Stream::Stdout) {
+        // Interactive TUI mode (default for humans)
+        let action = crate::tui::run()?;
+        handle_tui_action(action)
     } else {
-        display_status(json)
+        // Non-TTY: auto-degrade to JSON
+        display_status(true)
     }
 }
 
-fn run_watch_mode(json: bool) -> Result<()> {
-    loop {
-        // Clear screen
-        print!("\x1B[2J\x1B[1;1H");
-        io::stdout().flush().ok();
+fn handle_tui_action(action: crate::tui::TuiAction) -> Result<()> {
+    use crate::tui::TuiAction;
 
-        display_status(json)?;
-
-        println!();
-        println!("(Refreshing every {}s, Ctrl+C to exit)", WATCH_INTERVAL_SECS);
-
-        thread::sleep(Duration::from_secs(WATCH_INTERVAL_SECS));
+    match action {
+        TuiAction::Quit => Ok(()),
+        TuiAction::EnterWorktree { path } => {
+            println!("cd {}", path);
+            Ok(())
+        }
+        TuiAction::Review { name } => {
+            // Execute review command
+            crate::commands::review::execute(name, false)
+        }
     }
 }
 
 fn display_status(json: bool) -> Result<()> {
-    let store = TaskStore::load()?;
+    let mut store = TaskStore::load()?;
     let config = WtConfig::load().ok();
 
     let mut metrics_list = Vec::new();
@@ -88,6 +86,7 @@ fn display_status(json: bool) -> Result<()> {
     let mut done_count = 0;
     let mut total_additions = 0;
     let mut total_deletions = 0;
+    let mut tasks_to_mark_done: Vec<String> = Vec::new();
 
     for task in store.list() {
         let status = store.get_status(task.name());
@@ -97,7 +96,22 @@ fn display_status(json: bool) -> Result<()> {
             continue;
         }
 
-        if status == TaskStatus::Running {
+        let instance = store.get_instance(task.name());
+
+        // Check if tmux window is alive (for auto-done detection)
+        let tmux_alive = instance
+            .map(|i| tmux::window_exists(&i.tmux_session, &i.tmux_window))
+            .unwrap_or(false);
+
+        // Auto-mark as Done if Running but tmux window gone
+        let final_status = if status == TaskStatus::Running && !tmux_alive {
+            tasks_to_mark_done.push(task.name().to_string());
+            TaskStatus::Done
+        } else {
+            status
+        };
+
+        if final_status == TaskStatus::Running {
             running_count += 1;
         } else {
             done_count += 1;
@@ -105,17 +119,21 @@ fn display_status(json: bool) -> Result<()> {
 
         let instance = store.get_instance(task.name());
         let worktree_path = instance.map(|i| i.worktree_path.as_str());
-        let started_at = instance.and_then(|i| i.started_at);
 
-        // Calculate duration
-        let (duration_secs, duration_human) = if let Some(start) = started_at {
-            let now = Utc::now();
-            let duration = now.signed_duration_since(start);
-            let secs = duration.num_seconds();
-            (Some(secs), Some(format_duration(secs)))
-        } else {
-            (None, None)
-        };
+        // Parse transcript for duration
+        let transcript_metrics = instance.and_then(|inst| {
+            inst.session_id
+                .as_ref()
+                .and_then(|sid| transcript::transcript_path(&inst.worktree_path, sid))
+                .and_then(|path| transcript::parse_transcript(&path))
+        });
+
+        // Duration from transcript timestamps
+        let (duration_secs, duration_human) = transcript_metrics
+            .as_ref()
+            .and_then(|m| m.duration_secs())
+            .map(|secs| (Some(secs), Some(format_duration(secs))))
+            .unwrap_or((None, None));
 
         // Get diff stats
         let (additions, deletions) = worktree_path
@@ -131,9 +149,9 @@ fn display_status(json: bool) -> Result<()> {
                 config.as_ref().and_then(|_| git::get_commit_count(p, "HEAD~100"))
             });
 
-        // Check if tmux window is alive (only for running tasks)
-        let tmux_alive = if status == TaskStatus::Running {
-            instance.map(|i| tmux::window_exists(&i.tmux_session, &i.tmux_window))
+        // tmux_alive for JSON output (only meaningful for running tasks)
+        let tmux_alive_for_output = if final_status == TaskStatus::Running {
+            Some(tmux_alive)
         } else {
             None
         };
@@ -156,7 +174,7 @@ fn display_status(json: bool) -> Result<()> {
 
         metrics_list.push(TaskMetrics {
             name: task.name().to_string(),
-            status,
+            status: final_status,
             duration_secs,
             duration_human,
             additions: if additions > 0 { Some(additions) } else { None },
@@ -164,8 +182,16 @@ fn display_status(json: bool) -> Result<()> {
             commits,
             idle_secs,
             active,
-            tmux_alive,
+            tmux_alive: tmux_alive_for_output,
         });
+    }
+
+    // Auto-mark tasks as Done
+    if !tasks_to_mark_done.is_empty() {
+        for name in &tasks_to_mark_done {
+            store.set_status(name, TaskStatus::Done);
+        }
+        store.save_status()?;
     }
 
     let output = StatusOutput {
