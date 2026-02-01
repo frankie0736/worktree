@@ -114,10 +114,13 @@ impl App {
                 .and_then(|m| m.duration_secs())
                 .map(format_duration);
 
-            // Git changes
-            let (additions, deletions) = worktree_path
+            // Git metrics (additions, deletions, commits, conflict)
+            let git_metrics = worktree_path
                 .as_deref()
-                .and_then(git::get_diff_stats)
+                .and_then(git::get_worktree_metrics);
+            let (additions, deletions) = git_metrics
+                .as_ref()
+                .map(|m| (m.additions, m.deletions))
                 .unwrap_or((0, 0));
 
             // Activity status
@@ -145,16 +148,10 @@ impl App {
                 .as_ref()
                 .and_then(|m| m.current_tool.clone());
 
-            // Commit count and conflict status
-            let (commit_count, has_conflict) = worktree_path
-                .as_deref()
-                .map(|path| {
-                    let count = git::get_commit_count(path, "main")
-                        .or_else(|| git::get_commit_count(path, "master"))
-                        .unwrap_or(0);
-                    let conflict = git::has_conflicts(path);
-                    (count, conflict)
-                })
+            // Commit count and conflict status from git metrics
+            let (commit_count, has_conflict) = git_metrics
+                .as_ref()
+                .map(|m| (m.commits, m.has_conflict))
                 .unwrap_or((0, false));
 
             // Get tmux and session info

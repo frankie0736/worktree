@@ -225,20 +225,19 @@ fn display_status(json: bool) -> Result<()> {
         let context_percent = transcript_metrics.as_ref().map(|m| m.context_percent());
         let current_tool = transcript_metrics.as_ref().and_then(|m| m.current_tool.clone());
 
-        // Get diff stats
-        let (additions, deletions) = worktree_path
-            .and_then(git::get_diff_stats)
+        // Get git metrics (additions, deletions, commits, conflict)
+        let git_metrics = worktree_path.and_then(git::get_worktree_metrics);
+        let (additions, deletions) = git_metrics
+            .as_ref()
+            .map(|m| (m.additions, m.deletions))
             .unwrap_or((0, 0));
 
         total_additions += additions;
         total_deletions += deletions;
 
-        // Get commit count and conflict status
-        let commits = worktree_path.and_then(|p| {
-            git::get_commit_count(p, "main")
-                .or_else(|| git::get_commit_count(p, "master"))
-        });
-        let has_conflict = worktree_path.map(git::has_conflicts);
+        // Get commit count and conflict status from git metrics
+        let commits = git_metrics.as_ref().map(|m| m.commits);
+        let has_conflict = git_metrics.as_ref().map(|m| m.has_conflict);
 
         // tmux_alive for JSON output (only meaningful for running tasks)
         let tmux_alive_for_output = if final_status == TaskStatus::Running {

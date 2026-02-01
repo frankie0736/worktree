@@ -4,6 +4,36 @@ use std::time::SystemTime;
 use crate::error::{Result, WtError};
 use crate::services::command::CommandRunner;
 
+/// Git worktree statistics
+#[derive(Debug, Clone, Default)]
+pub struct GitMetrics {
+    pub additions: i32,
+    pub deletions: i32,
+    pub commits: i32,
+    pub has_conflict: bool,
+}
+
+/// Get git statistics for a worktree
+pub fn get_worktree_metrics(worktree_path: &str) -> Option<GitMetrics> {
+    let path = Path::new(worktree_path);
+    if !path.exists() {
+        return None;
+    }
+
+    let (additions, deletions) = get_diff_stats(worktree_path).unwrap_or((0, 0));
+    let commits = get_commit_count(worktree_path, "main")
+        .or_else(|| get_commit_count(worktree_path, "master"))
+        .unwrap_or(0);
+    let has_conflict = has_conflicts(worktree_path);
+
+    Some(GitMetrics {
+        additions,
+        deletions,
+        commits,
+        has_conflict,
+    })
+}
+
 pub fn create_worktree(branch: &str, path: &str) -> Result<()> {
     let worktree_path = Path::new(path);
     if let Some(parent) = worktree_path.parent() {
@@ -87,7 +117,7 @@ fn get_default_branch(worktree_path: &str) -> Option<String> {
 fn parse_diff_stats(output: &str) -> Option<(i32, i32)> {
     let output = output.trim();
     if output.is_empty() {
-        return Some((0, 0));
+        return None; // Return None to trigger fallback to uncommitted changes
     }
 
     let mut insertions = 0;
@@ -164,8 +194,9 @@ mod tests {
 
     #[test]
     fn test_parse_diff_stats_empty() {
-        assert_eq!(parse_diff_stats(""), Some((0, 0)));
-        assert_eq!(parse_diff_stats("  "), Some((0, 0)));
+        // Empty output returns None to trigger fallback to uncommitted changes
+        assert_eq!(parse_diff_stats(""), None);
+        assert_eq!(parse_diff_stats("  "), None);
     }
 
     #[test]
