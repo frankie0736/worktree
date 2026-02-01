@@ -78,20 +78,22 @@ pub fn get_diff_stats(worktree_path: &str) -> Option<(i32, i32)> {
     // Try to find the base branch (main or master)
     let base = get_default_branch(worktree_path).unwrap_or_else(|| "main".to_string());
 
-    // Use merge-base to find common ancestor, then diff from there
+    // Try committed changes first (main...HEAD)
     let output = CommandRunner::new("git")
         .current_dir(worktree_path)
         .output(&["diff", "--shortstat", &format!("{}...HEAD", base)]);
 
     if let Ok(stdout) = output {
-        parse_diff_stats(&stdout)
-    } else {
-        // Fallback to uncommitted changes only
-        let output = CommandRunner::new("git")
-            .current_dir(worktree_path)
-            .output(&["diff", "--shortstat", "HEAD"]);
-        output.ok().and_then(|s| parse_diff_stats(&s))
+        if let Some(stats) = parse_diff_stats(&stdout) {
+            return Some(stats);
+        }
     }
+
+    // Fallback: show uncommitted changes (diff HEAD)
+    let output = CommandRunner::new("git")
+        .current_dir(worktree_path)
+        .output(&["diff", "--shortstat", "HEAD"]);
+    output.ok().and_then(|s| parse_diff_stats(&s))
 }
 
 /// Get the default branch name (main or master)
