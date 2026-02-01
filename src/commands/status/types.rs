@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use serde::Serialize;
 
 use crate::models::TaskStatus;
+use crate::services::git::GitMetrics;
 
 /// Task metrics for status output
 #[derive(Serialize)]
@@ -17,14 +18,8 @@ pub struct TaskMetrics {
     pub context_percent: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub current_tool: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub additions: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deletions: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub commits: Option<i32>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub has_conflict: Option<bool>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    pub git: Option<GitMetrics>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub idle_secs: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]

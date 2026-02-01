@@ -1,11 +1,13 @@
 use std::path::Path;
 use std::time::SystemTime;
 
+use serde::Serialize;
+
 use crate::error::{Result, WtError};
 use crate::services::command::CommandRunner;
 
 /// Git worktree statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct GitMetrics {
     pub additions: i32,
     pub deletions: i32,

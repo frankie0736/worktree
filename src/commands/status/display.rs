@@ -78,17 +78,11 @@ pub fn display_status(json: bool) -> Result<()> {
 
         // Get git metrics (additions, deletions, commits, conflict)
         let git_metrics = worktree_path.and_then(git::get_worktree_metrics);
-        let (additions, deletions) = git_metrics
-            .as_ref()
-            .map(|m| (m.additions, m.deletions))
-            .unwrap_or((0, 0));
 
-        total_additions += additions;
-        total_deletions += deletions;
-
-        // Get commit count and conflict status from git metrics
-        let commits = git_metrics.as_ref().map(|m| m.commits);
-        let has_conflict = git_metrics.as_ref().map(|m| m.has_conflict);
+        if let Some(ref m) = git_metrics {
+            total_additions += m.additions;
+            total_deletions += m.deletions;
+        }
 
         // tmux_alive for JSON output (only meaningful for running tasks)
         let tmux_alive_for_output = if final_status == TaskStatus::Running {
@@ -120,10 +114,7 @@ pub fn display_status(json: bool) -> Result<()> {
             duration_human,
             context_percent,
             current_tool,
-            additions: if additions > 0 { Some(additions) } else { None },
-            deletions: if deletions > 0 { Some(deletions) } else { None },
-            commits,
-            has_conflict,
+            git: git_metrics,
             idle_secs,
             active,
             tmux_alive: tmux_alive_for_output,
@@ -188,16 +179,12 @@ fn print_human_readable(output: &StatusOutput) {
             println!("    Duration: {}", duration);
         }
 
-        let has_changes = task.additions.is_some() || task.deletions.is_some();
-        if has_changes {
-            let adds = task.additions.unwrap_or(0);
-            let dels = task.deletions.unwrap_or(0);
-            println!("    Changes:  +{} -{}", adds, dels);
-        }
-
-        if let Some(commits) = task.commits {
-            if commits > 0 {
-                println!("    Commits:  {}", commits);
+        if let Some(ref git) = task.git {
+            if git.additions > 0 || git.deletions > 0 {
+                println!("    Changes:  +{} -{}", git.additions, git.deletions);
+            }
+            if git.commits > 0 {
+                println!("    Commits:  {}", git.commits);
             }
         }
 
