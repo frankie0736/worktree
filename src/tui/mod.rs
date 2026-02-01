@@ -6,6 +6,7 @@ mod ui;
 pub use app::{App, TuiAction};
 
 use std::io;
+use std::process::Command;
 use std::time::Duration;
 
 use crossterm::{
@@ -93,10 +94,42 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<TuiA
                         KeyCode::Up | KeyCode::Char('k') => app.previous(),
                         KeyCode::Down | KeyCode::Char('j') => app.next(),
 
-                        // Enter worktree
+                        // Enter: switch/attach tmux or show resume command
                         KeyCode::Enter => {
-                            if let Some(action) = app.enter_worktree_action() {
-                                return Ok(action);
+                            if let Some(action) = app.enter_action() {
+                                match &action {
+                                    TuiAction::SwitchTmuxWindow { session, window } => {
+                                        // Inside tmux: temporarily leave TUI to switch window
+                                        disable_raw_mode().ok();
+                                        let mut stdout = io::stdout();
+                                        execute!(stdout, LeaveAlternateScreen, DisableMouseCapture)
+                                            .ok();
+
+                                        // Switch to target tmux window
+                                        Command::new("tmux")
+                                            .args([
+                                                "select-window",
+                                                "-t",
+                                                &format!("{}:{}", session, window),
+                                            ])
+                                            .status()
+                                            .ok();
+
+                                        // Re-enter TUI (user can switch back with tmux keybind)
+                                        enable_raw_mode().ok();
+                                        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)
+                                            .ok();
+
+                                        // Refresh data after returning
+                                        app.refresh()?;
+                                    }
+                                    TuiAction::AttachTmux { .. }
+                                    | TuiAction::ShowResume { .. } => {
+                                        // Exit TUI and handle in status.rs
+                                        return Ok(action);
+                                    }
+                                    _ => {}
+                                }
                             }
                         }
 

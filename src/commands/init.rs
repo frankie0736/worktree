@@ -9,8 +9,7 @@ const GITIGNORE_MARKER: &str = "# wt - Worktree Task Manager";
 
 const GITIGNORE_ENTRIES: &str = r#"# wt - Worktree Task Manager
 # https://github.com/anthropics/wt
-.wt-worktrees/    # git worktree directories (auto-generated)
-.wt/status.json   # runtime task status (auto-generated)
+.wt/
 "#;
 
 fn get_project_name() -> String {
@@ -22,28 +21,46 @@ fn get_project_name() -> String {
 
 fn generate_config(project_name: &str) -> String {
     format!(
-        r#"# wt configuration
-# See: https://github.com/anthropics/wt
+        r#"# wt 配置文件
+# 文档: https://github.com/anthropics/wt
 
-# Agent command template
-# Available variables:
-#   {{name}}      - task name (e.g., "auth-module")
-#   {{task_file}} - task file path (e.g., ".wt/tasks/auth-module.md")
-#   {{tasks_dir}} - tasks directory (".wt/tasks")
-agent_command: claude --verbose --output-format=stream-json --input-format=stream-json -p "@{{task_file}} 请完成这个任务"
+# ============================================
+# 主要配置
+# ============================================
 
-# Tmux session name (unique per project to avoid conflicts)
+# wt start 执行的参数
+# 支持模板变量: ${{task}}, ${{branch}}, ${{worktree}}
+start_args: --verbose --output-format=stream-json --input-format=stream-json -p "@.wt/tasks/${{task}}.md 请完成这个任务"
+
+# ============================================
+# 可选配置
+# ============================================
+
+# Claude CLI 命令
+# 默认: claude
+# 如果你使用别名或想添加全局 flags，在这里配置
+# 示例: ccc, claude --yolo, /path/to/claude
+# claude_command: claude
+
+# tmux session 名称
+# 默认: 项目目录名
 tmux_session: {}
 
-# Directory for git worktrees
-worktree_dir: .wt-worktrees
+# Worktree 存放目录
+# 默认: .wt/worktrees
+# 支持相对路径（相对于项目根目录）和绝对路径
+# worktree_dir: .wt/worktrees
 
-# Files to copy to each worktree (optional)
-copy_files:
-  - .env
+# 初始化脚本 (在每个新 worktree 中执行)
+# 例如安装依赖、设置环境等
+# init_script: |
+#   npm install
 
-# Script to run after creating worktree (optional)
-# init_script: npm install
+# 需要复制到 worktree 的文件
+# 这些文件不会被 git checkout 带过去
+# copy_files:
+#   - .env
+#   - .env.local
 "#,
         project_name
     )
@@ -89,6 +106,7 @@ fn update_gitignore() -> Result<bool> {
 }
 
 pub fn execute() -> Result<()> {
+    let wt_dir = Path::new(".wt");
     let config_path = Path::new(CONFIG_FILE);
     let tasks_dir = Path::new(TASKS_DIR);
 
@@ -103,7 +121,16 @@ pub fn execute() -> Result<()> {
 
     let project_name = get_project_name();
 
-    // Create .wt.yaml
+    // Create .wt/ directory
+    if !wt_dir.exists() {
+        fs::create_dir(wt_dir).map_err(|e| WtError::Io {
+            operation: "create".to_string(),
+            path: ".wt".to_string(),
+            message: e.to_string(),
+        })?;
+    }
+
+    // Create .wt/config.yaml
     let config_content = generate_config(&project_name);
     fs::write(config_path, &config_content).map_err(|e| WtError::Io {
         operation: "create".to_string(),
@@ -154,11 +181,23 @@ mod tests {
     #[test]
     fn test_generate_config_has_required_fields() {
         let config = generate_config("test");
-        assert!(config.contains("agent_command:"));
+        assert!(config.contains("start_args:"));
         assert!(config.contains("tmux_session:"));
         assert!(config.contains("worktree_dir:"));
         assert!(config.contains("copy_files:"));
         assert!(config.contains(".env"));
+    }
+
+    #[test]
+    fn test_generate_config_has_claude_command_comment() {
+        let config = generate_config("test");
+        assert!(config.contains("claude_command:"));
+    }
+
+    #[test]
+    fn test_generate_config_has_template_variables() {
+        let config = generate_config("test");
+        assert!(config.contains("${task}"));
     }
 
     #[test]
@@ -167,12 +206,7 @@ mod tests {
     }
 
     #[test]
-    fn test_gitignore_entries_has_worktree_dir() {
-        assert!(GITIGNORE_ENTRIES.contains(".wt-worktrees/"));
-    }
-
-    #[test]
-    fn test_gitignore_entries_has_status_file() {
-        assert!(GITIGNORE_ENTRIES.contains(".wt/status.json"));
+    fn test_gitignore_entries_has_wt_dir() {
+        assert!(GITIGNORE_ENTRIES.contains(".wt/"));
     }
 }

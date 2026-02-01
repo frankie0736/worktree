@@ -48,11 +48,39 @@ wt merged auth                             # PR 合并后
 | 按键 | 功能 |
 |------|------|
 | `↑↓` / `jk` | 导航 |
-| `Enter` | 进入 worktree 目录 |
+| `Enter` | 进入 tmux 窗口 |
 | `r` | review (Done 任务) |
 | `d` | 标记 done (agent 已退出) |
 | `m` | 标记 merged |
 | `q` | 退出 |
+
+**Enter 行为**：
+- tmux 内 + 窗口存在 → 切换到目标窗口
+- tmux 内 + 窗口已关 → 输出 resume 命令
+- tmux 外 + 窗口存在 → 执行 `tmux attach`
+- tmux 外 + 窗口已关 → 输出 resume 命令
+
+## 配置
+
+配置文件位于 `.wt/config.yaml`：
+
+```yaml
+# Claude CLI 命令（默认: claude）
+# 如果你使用别名，在这里配置
+# claude_command: ccc
+
+# wt start 执行的参数
+start_args: --verbose --output-format=stream-json -p "@.wt/tasks/${task}.md 请完成任务"
+
+# tmux session 名称
+tmux_session: my-project
+
+# 其他可选配置
+# worktree_dir: .wt/worktrees
+# init_script: npm install
+# copy_files:
+#   - .env
+```
 
 ## 任务状态
 

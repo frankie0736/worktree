@@ -57,9 +57,10 @@ pub fn setup_test_repo() -> TempDir {
         .output()
         .ok();
 
+    fs::create_dir_all(dir.path().join(".wt")).unwrap();
     fs::write(
-        dir.path().join(".wt.yaml"),
-        "agent_command: echo test\ntmux_session: test-wt\n",
+        dir.path().join(".wt/config.yaml"),
+        "start_args: -p test\ntmux_session: test-wt\n",
     )
     .unwrap();
 

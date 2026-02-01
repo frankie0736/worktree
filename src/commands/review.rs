@@ -48,7 +48,7 @@ struct CommandsOutput {
 }
 
 pub fn execute(name: String, json: bool) -> Result<()> {
-    let _config = WtConfig::load()?;
+    let config = WtConfig::load()?;
     let mut store = TaskStore::load()?;
 
     // Check task exists
@@ -110,11 +110,14 @@ pub fn execute(name: String, json: bool) -> Result<()> {
     // Parse transcript
     let metrics = transcript::parse_transcript(&transcript_path);
 
-    // Build commands
-    let interactive_cmd = format!("cd {} && claude -r {}", worktree_path, session_id);
+    // Build commands using claude_command from config
+    let interactive_cmd = format!(
+        "cd {} && {} -r {}",
+        worktree_path, config.claude_command, session_id
+    );
     let non_interactive_cmd = format!(
-        "cd {} && claude --output-format stream-json -r {} -p \"继续完成任务\"",
-        worktree_path, session_id
+        "cd {} && {} --output-format stream-json -r {} -p \"继续完成任务\"",
+        worktree_path, config.claude_command, session_id
     );
 
     if json {

@@ -61,11 +61,17 @@ wt cleanup [--all]
 | 按键 | 功能 |
 |------|------|
 | `↑↓` / `jk` | 导航 |
-| `Enter` | 进入 worktree 目录 |
+| `Enter` | 进入 tmux 窗口 |
 | `r` | review (Done 任务) |
 | `d` | 标记 done (agent 已退出) |
 | `m` | 标记 merged |
 | `q` | 退出 |
+
+**Enter 行为**：
+- tmux 内 + 窗口存在 → 切换到目标窗口
+- tmux 内 + 窗口已关 → 输出 resume 命令
+- tmux 外 + 窗口存在 → 执行 `tmux attach`
+- tmux 外 + 窗口已关 → 输出 resume 命令
 
 ## JSON 格式
 

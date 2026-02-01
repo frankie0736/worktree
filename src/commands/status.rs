@@ -63,11 +63,29 @@ pub fn execute(json: bool) -> Result<()> {
 
 fn handle_tui_action(action: crate::tui::TuiAction) -> Result<()> {
     use crate::tui::TuiAction;
+    use std::process::Command;
 
     match action {
         TuiAction::Quit => Ok(()),
-        TuiAction::EnterWorktree { path } => {
-            println!("cd {}", path);
+        TuiAction::SwitchTmuxWindow { .. } => {
+            // This should be handled within TUI, not here
+            Ok(())
+        }
+        TuiAction::AttachTmux { session, window } => {
+            // Outside tmux: directly attach to session
+            Command::new("tmux")
+                .args(["attach", "-t", &format!("{}:{}", session, window)])
+                .status()
+                .ok();
+            Ok(())
+        }
+        TuiAction::ShowResume {
+            worktree,
+            session_id,
+            claude_command,
+        } => {
+            eprintln!("Tmux window closed. Run this command to resume:");
+            println!("cd {} && {} -r {}", worktree, claude_command, session_id);
             Ok(())
         }
         TuiAction::Review { name } => {

@@ -8,13 +8,21 @@ use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore, WtConfig};
 use crate::services::{git, tmux, transcript};
 
-/// Action to perform after TUI exits
+/// Action to perform after TUI exits or during TUI
 #[derive(Debug, Clone)]
 pub enum TuiAction {
     /// Just quit, no action
     Quit,
-    /// Enter worktree directory (outputs cd command)
-    EnterWorktree { path: String },
+    /// Switch to tmux window (inside tmux, window exists)
+    SwitchTmuxWindow { session: String, window: String },
+    /// Attach to tmux session (outside tmux, window exists)
+    AttachTmux { session: String, window: String },
+    /// Show resume command (tmux window closed, need to copy command)
+    ShowResume {
+        worktree: String,
+        session_id: String,
+        claude_command: String,
+    },
     /// Review a done task
     Review { name: String },
 }
@@ -31,6 +39,9 @@ pub struct TaskDisplay {
     pub active: bool,
     pub tmux_alive: bool,
     pub worktree_path: Option<String>,
+    pub tmux_session: Option<String>,
+    pub tmux_window: Option<String>,
+    pub session_id: Option<String>,
 }
 
 /// Application state
@@ -126,6 +137,17 @@ impl App {
                 .map(|m| m.context_percent())
                 .unwrap_or(0);
 
+            // Get tmux and session info
+            let (tmux_session, tmux_window, session_id) = instance
+                .map(|i| {
+                    (
+                        Some(i.tmux_session.clone()),
+                        Some(i.tmux_window.clone()),
+                        i.session_id.clone(),
+                    )
+                })
+                .unwrap_or((None, None, None));
+
             tasks.push(TaskDisplay {
                 name: task.name().to_string(),
                 status: final_status,
@@ -136,6 +158,9 @@ impl App {
                 active,
                 tmux_alive,
                 worktree_path,
+                tmux_session,
+                tmux_window,
+                session_id,
             });
         }
 
@@ -218,13 +243,52 @@ impl App {
         Ok(())
     }
 
-    /// Get action to enter worktree for selected task
-    pub fn enter_worktree_action(&self) -> Option<TuiAction> {
-        self.selected_task().and_then(|task| {
-            task.worktree_path.as_ref().map(|path| TuiAction::EnterWorktree {
-                path: path.clone(),
+    /// Check if running inside tmux
+    pub fn is_in_tmux(&self) -> bool {
+        std::env::var("TMUX").is_ok()
+    }
+
+    /// Get action for Enter key on selected task
+    /// - Inside tmux + window exists: attach to it
+    /// - Inside tmux + window closed: show resume command
+    /// - Outside tmux: show tmux attach command
+    pub fn enter_action(&self) -> Option<TuiAction> {
+        let task = self.selected_task()?;
+
+        // Need tmux session and window info
+        let session = task.tmux_session.as_ref()?;
+        let window = task.tmux_window.as_ref()?;
+
+        let claude_command = self
+            .config
+            .as_ref()
+            .map(|c| c.claude_command.clone())
+            .unwrap_or_else(|| "claude".to_string());
+
+        if task.tmux_alive {
+            if self.is_in_tmux() {
+                // Inside tmux: switch to target window
+                Some(TuiAction::SwitchTmuxWindow {
+                    session: session.clone(),
+                    window: window.clone(),
+                })
+            } else {
+                // Outside tmux: attach to session
+                Some(TuiAction::AttachTmux {
+                    session: session.clone(),
+                    window: window.clone(),
+                })
+            }
+        } else {
+            // Tmux window closed, show resume command
+            let worktree = task.worktree_path.as_ref()?;
+            let session_id = task.session_id.as_ref()?;
+            Some(TuiAction::ShowResume {
+                worktree: worktree.clone(),
+                session_id: session_id.clone(),
+                claude_command,
             })
-        })
+        }
     }
 
     /// Get action to review selected task

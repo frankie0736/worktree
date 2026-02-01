@@ -20,7 +20,7 @@ src/
 │   ├── task.rs       # Task, TaskStatus, TaskInput, Instance
 │   ├── status.rs     # StatusStore, TaskState (运行时状态)
 │   ├── store.rs      # TaskStore (加载任务 + 状态)
-│   └── config.rs     # WtConfig (.wt.yaml 解析)
+│   └── config.rs     # WtConfig (.wt/config.yaml 解析)
 ├── commands/         # 各子命令实现
 │   ├── init.rs
 │   ├── create.rs
@@ -48,6 +48,25 @@ src/
 ```
 
 ## 核心概念
+
+### 配置文件 (.wt/config.yaml)
+
+```yaml
+# Claude CLI 命令（默认: claude）
+claude_command: claude
+
+# wt start 执行的参数
+start_args: --verbose --output-format=stream-json -p "@.wt/tasks/${task}.md ..."
+
+# tmux session 名称
+tmux_session: project-name
+
+# 其他可选配置
+worktree_dir: .wt/worktrees
+init_script: npm install
+copy_files:
+  - .env
+```
 
 ### Task（任务）
 
@@ -108,5 +127,3 @@ cargo install --path .   # 安装到 ~/.cargo/bin
 - @.claude/rules/rust-style.md - Rust 编码规范
 - @.claude/rules/testing.md - 测试指南
 - @.claude/rules/cli/commands.md - CLI 命令实现规范
-- @.claude/specs/wt-review.md - review 命令规格
-- @.claude/specs/directory-restructure.md - 目录重构规格（待实现）

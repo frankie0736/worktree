@@ -4,10 +4,10 @@
 pub const TASKS_DIR: &str = ".wt/tasks";
 
 /// Configuration file name
-pub const CONFIG_FILE: &str = ".wt.yaml";
+pub const CONFIG_FILE: &str = ".wt/config.yaml";
 
 /// Default worktree directory
-pub const DEFAULT_WORKTREE_DIR: &str = ".wt-worktrees";
+pub const DEFAULT_WORKTREE_DIR: &str = ".wt/worktrees";
 
 /// Default tmux session name
 pub const DEFAULT_TMUX_SESSION: &str = "wt";

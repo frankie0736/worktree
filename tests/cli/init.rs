@@ -30,8 +30,8 @@ fn test_init_creates_config_file() {
     let (ok, stdout, _) = run_wt(dir.path(), &["init"]);
 
     assert!(ok);
-    assert!(stdout.contains("Created .wt.yaml"));
-    assert!(dir.path().join(".wt.yaml").exists());
+    assert!(stdout.contains("Created .wt/config.yaml"));
+    assert!(dir.path().join(".wt/config.yaml").exists());
 }
 
 #[test]
@@ -53,8 +53,7 @@ fn test_init_creates_gitignore() {
     assert!(stdout.contains(".gitignore"));
 
     let gitignore = fs::read_to_string(dir.path().join(".gitignore")).unwrap();
-    assert!(gitignore.contains(".wt-worktrees/"));
-    assert!(gitignore.contains(".wt/status.json"));
+    assert!(gitignore.contains(".wt/"));
     assert!(gitignore.contains("# wt - Worktree Task Manager"));
 }
 
@@ -74,9 +73,8 @@ fn test_init_appends_to_existing_gitignore() {
     // Should preserve existing content
     assert!(gitignore.contains("node_modules/"));
     assert!(gitignore.contains(".env"));
-    // Should add wt entries
-    assert!(gitignore.contains(".wt-worktrees/"));
-    assert!(gitignore.contains(".wt/status.json"));
+    // Should add wt entry
+    assert!(gitignore.contains(".wt/"));
 }
 
 #[test]
@@ -86,7 +84,7 @@ fn test_init_does_not_duplicate_gitignore_entries() {
     // Create .gitignore with wt marker already
     fs::write(
         dir.path().join(".gitignore"),
-        "node_modules/\n# wt - Worktree Task Manager\n.wt-worktrees/\n",
+        "node_modules/\n# wt - Worktree Task Manager\n.wt/\n",
     )
     .unwrap();
 
@@ -106,7 +104,8 @@ fn test_init_fails_if_config_exists() {
     let dir = setup_bare_git_repo();
 
     // Create existing config
-    fs::write(dir.path().join(".wt.yaml"), "agent_command: test\n").unwrap();
+    fs::create_dir_all(dir.path().join(".wt")).unwrap();
+    fs::write(dir.path().join(".wt/config.yaml"), "agent_command: test\n").unwrap();
 
     let (ok, _, stderr) = run_wt(dir.path(), &["init"]);
 
@@ -119,9 +118,9 @@ fn test_init_config_has_required_fields() {
     let dir = setup_bare_git_repo();
     run_wt(dir.path(), &["init"]);
 
-    let config = fs::read_to_string(dir.path().join(".wt.yaml")).unwrap();
+    let config = fs::read_to_string(dir.path().join(".wt/config.yaml")).unwrap();
 
-    assert!(config.contains("agent_command:"));
+    assert!(config.contains("start_args:"));
     assert!(config.contains("tmux_session:"));
     assert!(config.contains("worktree_dir:"));
     assert!(config.contains("copy_files:"));
@@ -133,7 +132,7 @@ fn test_init_config_has_stream_json_flags() {
     let dir = setup_bare_git_repo();
     run_wt(dir.path(), &["init"]);
 
-    let config = fs::read_to_string(dir.path().join(".wt.yaml")).unwrap();
+    let config = fs::read_to_string(dir.path().join(".wt/config.yaml")).unwrap();
 
     assert!(config.contains("--verbose"));
     assert!(config.contains("--output-format=stream-json"));
@@ -145,7 +144,7 @@ fn test_init_uses_directory_name_as_session() {
     let dir = setup_bare_git_repo();
     run_wt(dir.path(), &["init"]);
 
-    let config = fs::read_to_string(dir.path().join(".wt.yaml")).unwrap();
+    let config = fs::read_to_string(dir.path().join(".wt/config.yaml")).unwrap();
 
     // The tempdir has a random name, just check it's not the default "wt"
     // and that tmux_session field exists with some value
@@ -159,7 +158,7 @@ fn test_init_shows_next_steps() {
 
     assert!(ok);
     assert!(stdout.contains("Next steps:"));
-    assert!(stdout.contains("Edit .wt.yaml"));
+    assert!(stdout.contains("Edit .wt/config.yaml"));
     assert!(stdout.contains("wt create"));
     assert!(stdout.contains("wt start"));
 }
@@ -191,5 +190,5 @@ fn test_init_existing_tasks_dir_is_ok() {
 
     assert!(ok);
     // Should still create config
-    assert!(stdout.contains("Created .wt.yaml"));
+    assert!(stdout.contains("Created .wt/config.yaml"));
 }

@@ -2,7 +2,7 @@ use std::env;
 
 use uuid::Uuid;
 
-use crate::constants::{TASKS_DIR, branch_name};
+use crate::constants::branch_name;
 use crate::error::{Result, WtError};
 use crate::models::{Instance, TaskStatus, TaskStore, WtConfig};
 use crate::services::{dependency, git, tmux, workspace::WorkspaceInitializer};
@@ -60,16 +60,18 @@ pub fn execute(name: String) -> Result<()> {
     // Generate session ID for Claude Code
     let session_id = Uuid::new_v4().to_string();
 
-    // Build agent command by replacing template variables
-    let task_file = format!("{}/{}.md", TASKS_DIR, name);
-    let expanded_cmd = config
-        .agent_command
-        .replace("{name}", &name)
-        .replace("{tasks_dir}", TASKS_DIR)
-        .replace("{task_file}", &task_file);
+    // Build agent command: claude_command + start_args
+    let expanded_args = config
+        .start_args
+        .replace("${task}", &name)
+        .replace("${branch}", &branch)
+        .replace("${worktree}", &worktree_path);
 
     // Add --session-id to the command for session tracking
-    let agent_cmd = format!("{} --session-id {}", expanded_cmd, session_id);
+    let agent_cmd = format!(
+        "{} {} --session-id {}",
+        config.claude_command, expanded_args, session_id
+    );
 
     tmux::create_window(&config.tmux_session, &name, &worktree_path, &agent_cmd)?;
 
@@ -95,7 +97,7 @@ pub fn execute(name: String) -> Result<()> {
     println!("  Branch:   {}", branch);
     println!();
     println!("进入工作区:");
-    println!("  wt enter {}    # 进入 tmux 窗口 (Ctrl+b d 退出)", name);
-    println!("  cd {}       # 或直接进入目录", relative_path);
+    println!("  wt status          # TUI 中按 Enter 进入 tmux 窗口");
+    println!("  cd {}    # 或直接进入目录", relative_path);
     Ok(())
 }
