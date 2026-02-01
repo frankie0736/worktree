@@ -39,6 +39,7 @@ wt reset auth                              # 重置（会备份代码）
 | `wt list [--tree] [--json]` | 列出任务 |
 | `wt next [--json]` | 显示可启动任务 |
 | `wt start <name>` | 启动任务 |
+| `wt start --all` | 启动所有就绪任务 |
 | `wt status [--json] [--action X --task Y]` | 查看状态 (默认 TUI) |
 | `wt tail <name> [-n N]` | 查看最后 N 条输出 (JSON) |
 | `wt logs` | 生成所有任务的过滤日志 |
@@ -89,7 +90,7 @@ tmux_session: my-project
 
 # 其他可选配置
 # worktree_dir: .wt/worktrees
-# init_script: npm install
+# init_script: npm install   # 在 tmux 窗口内并行执行
 # copy_files:
 #   - .env
 

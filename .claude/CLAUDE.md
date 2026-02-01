@@ -27,12 +27,16 @@ src/
 │   ├── validate.rs
 │   ├── list.rs
 │   ├── next.rs
-│   ├── start.rs
+│   ├── start.rs      # 支持 --all 批量启动
 │   ├── done.rs
 │   ├── merged.rs
 │   ├── archive.rs
 │   ├── reset.rs
-│   ├── status.rs
+│   ├── status/       # 状态命令（已模块化）
+│   │   ├── mod.rs    # 入口
+│   │   ├── types.rs  # 数据结构
+│   │   ├── display.rs # 显示逻辑
+│   │   └── actions.rs # Action API
 │   ├── tail.rs
 │   └── logs.rs
 ├── services/
