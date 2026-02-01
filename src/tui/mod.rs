@@ -154,6 +154,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<TuiA
                             }
                         }
 
+                        // Archive (Merged only)
+                        KeyCode::Char('a') => {
+                            if app.can_archive() {
+                                app.archive()?;
+                            }
+                        }
+
                         _ => {}
                     }
                 }

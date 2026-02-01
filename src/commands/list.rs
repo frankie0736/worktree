@@ -54,6 +54,7 @@ fn print_grouped(tasks: &[&Task], store: &TaskStore) {
     }
 
     // Group tasks by status
+    let mut archived: Vec<&Task> = Vec::new();
     let mut merged: Vec<&Task> = Vec::new();
     let mut ready: Vec<&Task> = Vec::new();
     let mut blocked: Vec<(&Task, Vec<&str>)> = Vec::new();
@@ -63,15 +64,19 @@ fn print_grouped(tasks: &[&Task], store: &TaskStore) {
     for task in tasks {
         let status = store.get_status(task.name());
         match status {
+            TaskStatus::Archived => archived.push(task),
             TaskStatus::Merged => merged.push(task),
             TaskStatus::Running => running.push(task),
             TaskStatus::Done => done.push(task),
             TaskStatus::Pending => {
-                // Check if all dependencies are merged
+                // Check if all dependencies are merged or archived
                 let unmerged_deps: Vec<&str> = task
                     .depends()
                     .iter()
-                    .filter(|dep| store.get_status(dep) != TaskStatus::Merged)
+                    .filter(|dep| {
+                        let dep_status = store.get_status(dep);
+                        dep_status != TaskStatus::Merged && dep_status != TaskStatus::Archived
+                    })
                     .map(|s| s.as_str())
                     .collect();
 
@@ -82,6 +87,15 @@ fn print_grouped(tasks: &[&Task], store: &TaskStore) {
                 }
             }
         }
+    }
+
+    // Print Archived
+    if !archived.is_empty() {
+        println!("Archived ({}):", archived.len());
+        for task in &archived {
+            println!("  {} {}", TaskStatus::Archived.icon(), task.name());
+        }
+        println!();
     }
 
     // Print Merged

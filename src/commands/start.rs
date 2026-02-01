@@ -23,7 +23,9 @@ pub fn execute(name: String) -> Result<()> {
 
     dependency::check_dependencies_merged(&store, &name)?;
 
-    let branch = branch_name(&name);
+    // Generate session ID for branch naming and Claude Code tracking
+    let session_id = Uuid::new_v4().to_string();
+    let branch = branch_name(&name, &session_id);
     let cwd = env::current_dir().map_err(|e| WtError::Git(e.to_string()))?;
     let worktree_path = cwd
         .join(&config.worktree_dir)
@@ -56,9 +58,6 @@ pub fn execute(name: String) -> Result<()> {
     if !tmux::session_exists(&config.tmux_session) {
         tmux::create_session(&config.tmux_session)?;
     }
-
-    // Generate session ID for Claude Code
-    let session_id = Uuid::new_v4().to_string();
 
     // Build agent command: claude_command + start_args
     let expanded_args = config

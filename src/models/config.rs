@@ -20,6 +20,9 @@ pub struct WtConfig {
     pub init_script: Option<String>,
     #[serde(default)]
     pub logs: LogsConfig,
+    /// Script to run before archiving/reset (optional, for cleanup like rm -rf node_modules/)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub archive_script: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -151,6 +154,7 @@ init_script: |
             copy_files: vec![".env".to_string()],
             init_script: Some("npm i".to_string()),
             logs: LogsConfig::default(),
+            archive_script: None,
         };
         let yaml = serde_yaml::to_string(&config).unwrap();
 
@@ -158,6 +162,18 @@ init_script: |
         assert!(yaml.contains("start_args:"));
         assert!(yaml.contains("copy_files:"));
         assert!(yaml.contains("init_script:"));
+    }
+
+    #[test]
+    fn test_config_with_archive_script() {
+        let yaml = r#"
+archive_script: |
+  rm -rf node_modules/
+  rm -rf dist/
+"#;
+        let config = WtConfig::from_str(yaml).unwrap();
+        assert!(config.archive_script.is_some());
+        assert!(config.archive_script.unwrap().contains("node_modules"));
     }
 
     #[test]

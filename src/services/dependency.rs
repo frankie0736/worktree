@@ -13,7 +13,9 @@ pub fn check_dependencies_merged(store: &TaskStore, task_name: &str) -> Result<(
             .ok_or_else(|| WtError::DependencyNotFound(dep_name.clone()))?;
 
         // Check dependency status from StatusStore
-        if store.get_status(dep_name) != TaskStatus::Merged {
+        // Both Merged and Archived are considered "completed"
+        let dep_status = store.get_status(dep_name);
+        if dep_status != TaskStatus::Merged && dep_status != TaskStatus::Archived {
             return Err(WtError::DependencyNotMerged {
                 task: task_name.to_string(),
                 dep: dep_name.clone(),

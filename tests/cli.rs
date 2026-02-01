@@ -24,8 +24,6 @@ mod start;
 mod done;
 #[path = "cli/merged.rs"]
 mod merged;
-#[path = "cli/cleanup.rs"]
-mod cleanup;
 #[path = "cli/help.rs"]
 mod help;
 #[path = "cli/no_config.rs"]

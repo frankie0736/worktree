@@ -24,7 +24,9 @@ wt status                                  # 查看状态 (TUI)
 wt tail auth                               # 查看最后输出
 wt logs                                    # 生成调试日志
 wt done auth                               # 标记完成
-wt merged auth                             # PR 合并后
+wt merged auth                             # PR 合并后（保留代码供查看）
+wt archive auth                            # 归档（清理 worktree 和分支）
+wt reset auth                              # 重置（会备份代码）
 ```
 
 ## 命令
@@ -41,9 +43,9 @@ wt merged auth                             # PR 合并后
 | `wt tail <name> [-n N]` | 查看最后 N 条输出 (JSON) |
 | `wt logs` | 生成所有任务的过滤日志 |
 | `wt done <name>` | 标记完成 |
-| `wt merged <name>` | 标记已合并 |
-| `wt reset <name>` | 重置任务到 pending |
-| `wt cleanup [--all]` | 清理资源 |
+| `wt merged <name>` | 标记已合并（保留 worktree）|
+| `wt archive <name>` | 归档（清理 worktree/分支）|
+| `wt reset <name>` | 重置到 pending（备份代码）|
 
 ## Status TUI 快捷键
 
@@ -54,6 +56,7 @@ wt merged auth                             # PR 合并后
 | `t` | tail (查看输出) |
 | `d` | 标记 done (agent 已退出) |
 | `m` | 标记 merged |
+| `a` | archive (归档，仅 Merged 状态) |
 | `q` | 退出 |
 
 **Enter 行为**：
@@ -87,13 +90,22 @@ tmux_session: my-project
 # logs:
 #   exclude_types: [system, progress]
 #   exclude_fields: [signature, uuid]
+
+# 归档/重置前的清理脚本
+# archive_script: |
+#   rm -rf node_modules/
+#   rm -rf dist/
 ```
 
 ## 任务状态
 
 ```
-○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged
+○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged  →  □ Archived
 ```
+
+- **reset** 可从 Running/Done/Merged/Archived 回到 Pending（会备份代码到 `.wt/backups/`）
+- **merged** 保留 worktree 和分支，方便查看代码
+- **archive** 执行清理脚本后删除 worktree 和分支
 
 ## License
 

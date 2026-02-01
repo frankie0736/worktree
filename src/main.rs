@@ -21,7 +21,7 @@ fn main() {
         Commands::Start { name } => commands::start::execute(name),
         Commands::Done { name } => commands::done::execute(name),
         Commands::Merged { name } => commands::merged::execute(name),
-        Commands::Cleanup { all } => commands::cleanup::execute(all),
+        Commands::Archive { name } => commands::archive::execute(name),
         Commands::Next { json } => commands::next::execute(json),
         Commands::Reset { name } => commands::reset::execute(name),
         Commands::Status { json } => commands::status::execute(json),

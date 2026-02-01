@@ -36,14 +36,24 @@ fn draw_header(frame: &mut Frame, area: Rect, app: &App) {
         .iter()
         .filter(|t| t.status == TaskStatus::Done)
         .count();
+    let merged = app
+        .tasks
+        .iter()
+        .filter(|t| t.status == TaskStatus::Merged)
+        .count();
 
-    let text = Line::from(vec![
+    let mut spans = vec![
         Span::styled(" wt status", Style::default().fg(Color::Cyan).bold()),
-        Span::raw("                                    "),
+        Span::raw("                              "),
         Span::styled(format!("{} running", running), Style::default().fg(Color::Green)),
         Span::raw(" · "),
         Span::styled(format!("{} done", done), Style::default().fg(Color::Blue)),
-    ]);
+    ];
+    if merged > 0 {
+        spans.push(Span::raw(" · "));
+        spans.push(Span::styled(format!("{} merged", merged), Style::default().fg(Color::Magenta)));
+    }
+    let text = Line::from(spans);
 
     frame.render_widget(Paragraph::new(text), area);
 
@@ -134,19 +144,19 @@ fn format_task_line(task: &TaskDisplay, selected: bool, _width: usize) -> Line<'
 }
 
 fn get_status_icon(task: &TaskDisplay) -> (&'static str, Color) {
-    if task.status == TaskStatus::Done {
-        return ("◉", Color::Blue);
-    }
-
-    // Running task
-    if !task.tmux_alive {
-        return ("⚠", Color::Yellow);
-    }
-
-    if task.active {
-        ("●", Color::Green)
-    } else {
-        ("○", Color::DarkGray)
+    match task.status {
+        TaskStatus::Done => ("◉", Color::Blue),
+        TaskStatus::Merged => ("✓", Color::Magenta),
+        TaskStatus::Running => {
+            if !task.tmux_alive {
+                ("⚠", Color::Yellow)
+            } else if task.active {
+                ("●", Color::Green)
+            } else {
+                ("○", Color::DarkGray)
+            }
+        }
+        _ => ("○", Color::DarkGray),
     }
 }
 
@@ -200,6 +210,10 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
                 // Done: m (merged)
                 spans.push(Span::styled("m", Style::default().fg(Color::Yellow)));
                 spans.push(Span::raw(" merged  "));
+            } else if task.status == TaskStatus::Merged {
+                // Merged: a (archive)
+                spans.push(Span::styled("a", Style::default().fg(Color::Yellow)));
+                spans.push(Span::raw(" archive  "));
             } else if task.status == TaskStatus::Running && !task.tmux_alive {
                 // Running but tmux exited: d (done)
                 spans.push(Span::styled("d", Style::default().fg(Color::Yellow)));

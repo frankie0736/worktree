@@ -1,13 +1,13 @@
-pub mod cleanup;
+pub mod archive;
 pub mod create;
 pub mod done;
 pub mod init;
 pub mod list;
+pub mod logs;
 pub mod merged;
 pub mod next;
 pub mod reset;
-pub mod logs;
-pub mod tail;
 pub mod start;
 pub mod status;
+pub mod tail;
 pub mod validate;

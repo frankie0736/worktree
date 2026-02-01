@@ -50,17 +50,16 @@ pub enum Commands {
         name: String,
     },
 
-    /// Mark a task as merged (cleanup and unblock dependents)
+    /// Mark a task as merged (keeps worktree/branch for review)
     Merged {
         /// Task name to mark as merged
         name: String,
     },
 
-    /// Cleanup worktrees and tmux windows
-    Cleanup {
-        /// Clean all tasks (not just merged ones)
-        #[arg(long)]
-        all: bool,
+    /// Archive a merged task (cleanup worktree and branch)
+    Archive {
+        /// Task name to archive
+        name: String,
     },
 
     /// Show tasks that are ready to start (all dependencies merged)

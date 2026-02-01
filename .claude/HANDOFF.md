@@ -1,161 +1,106 @@
 # Handoff 文档 - wt 开发进度
 
-## Session 5 完成的工作 (2026-02-02)
+## Session 6 完成的工作 (2026-02-02)
 
-### 1. 重构 `wt review` 为 `wt tail`
+### 1. 新增 Archived 状态
 
-**设计变更**：
-- 删除 `wt review` 命令
-- 新增 `wt tail <task> [-n <count>] [--json]` 命令
-- 专注输出 transcript 中的 assistant 消息，移除 metrics/stats
+**状态流变更**：
+```
+Pending → Running → Done → Merged → Archived
+            ↑________|________|________|
+                       (reset)
+```
 
-**命令用法**：
+- `Archived` 是新的终态，表示任务已彻底完成并清理
+- `reset` 现在可从 Running/Done/Merged/Archived 任一状态回到 Pending
+- `Archived` 和 `Merged` 都视为"已完成"，允许依赖它们的任务启动
+
+### 2. 重构 `wt merged` 命令
+
+**行为变更**：
+- 旧：merged 会删除 worktree、分支、tmux window
+- 新：merged 只关闭 tmux window，保留 worktree 和分支供查看
+
+### 3. 新增 `wt archive` 命令
+
+**功能**：将 Merged 任务归档，执行完整清理
+
 ```bash
-wt tail auth        # 输出最后 1 个 turn
-wt tail auth -n 3   # 输出最后 3 个 turns
+wt archive auth    # 归档 auth 任务
 ```
 
-**输出格式**：永远输出 JSON 数组
-```json
-[{"role": "assistant", "content": "..."}]
+**执行步骤**：
+1. 验证状态必须是 Merged
+2. 执行 `archive_script`（如配置）
+3. 删除 worktree、分支
+4. 状态变为 Archived，清除 instance
+
+### 4. 增强 `wt reset` 命令
+
+**新功能**：reset 前自动备份代码到 `.wt/backups/`
+
+```bash
+wt reset auth    # 备份后重置
+ls .wt/backups/  # 查看备份
 ```
 
-**内容提取**：优先提取 text，若无 text 则提取 thinking（包含任务摘要）
+**备份流程**：
+1. 执行 `archive_script` 瘦身（删除 node_modules 等）
+2. 复制代码到 `.wt/backups/{task}-{timestamp}/`
+3. 跳过 `.git` 目录
 
-**状态处理**：
-- Pending：错误退出
-- Running/Done/Merged：正常输出 transcript 内容
+### 5. 分支名添加唯一后缀
 
-### 2. 更新 TUI 快捷键
+**格式**：`wt/{task}-{session_id前4位}`
 
-| 按键 | 功能 |
-|------|------|
-| `t` | tail（替代原来的 `r` review） |
-| `d` | 标记 done |
-| `m` | 标记 merged |
+示例：`wt/auth-3e20`、`wt/ui-a1b2`
 
-### 3. 新增 `wt logs` 命令
+**目的**：避免同名任务重复 start 时分支冲突
 
-独立命令生成所有任务的过滤日志，与 `tail` 解耦。
+### 6. 新增配置项 `archive_script`
 
-**目录结构**：
-```
-.wt/logs/
-├── ui/
-│   └── 3e20cef2.jsonl
-└── auth/
-    └── a1b2c3d4.jsonl
-```
-
-**配置**（`.wt/config.yaml`）：
 ```yaml
-logs:
-  exclude_types:
-    - system
-    - progress
-  exclude_fields:
-    - signature
-    - parentUuid
+# .wt/config.yaml
+archive_script: |
+  rm -rf node_modules/
+  rm -rf dist/
+  rm -rf target/
 ```
 
-**使用**：
-```bash
-wt logs                           # 生成/更新所有任务的日志
-cat .wt/logs/ui/3e20cef2.jsonl    # 查看过滤后的日志
-```
+用于 archive 和 reset 前清理大文件。
 
-### 4. 错误类型重构
+### 7. 删除 `wt cleanup` 命令
 
-删除：`CannotReviewRunning`, `TaskNotDone`
-新增：`TaskNotStarted`, `TranscriptParseFailed`, `NoAssistantMessages`
+不再需要，用户可手动删除 `.wt/backups/` 目录。
 
----
-
-## Session 4 完成的工作 (2026-02-01)
-
-### 1. 目录结构重构
-
-- `.wt.yaml` → `.wt/config.yaml`
-- `.wt-worktrees/` → `.wt/worktrees/` (默认)
-- `.gitignore` 只需一条 `.wt/` 规则
-
-### 2. 配置项重构
-
-- 删除 `agent_command`
-- 新增 `claude_command`：基础命令，默认 `claude`，允许 `ccc` 或 `claude --yolo`
-- 新增 `start_args`：start 命令的参数
-
-**命令变更**：
-- `wt start`: 执行 `${claude_command} ${start_args}`
-- `wt review`: 使用 `${claude_command}` 替代硬编码的 `claude`
-
-### 3. TUI Enter 行为重构
-
-| 环境 | tmux 窗口状态 | Enter 行为 |
-|------|--------------|-----------|
-| tmux 内 | 存在 | 切换到目标窗口 |
-| tmux 内 | 已关 | 输出 resume 命令 |
-| tmux 外 | 存在 | 执行 `tmux attach` |
-| tmux 外 | 已关 | 输出 resume 命令 |
-
-### 4. 文档整理
-
-- 删除已实现的 specs 文件
-- 更新 README.md、CLAUDE.md、SKILL.md
-- 移除 `wt enter` 命令相关提示
-
----
-
-## Session 3 完成的工作 (2026-02-01)
-
-### 1. 简化 `wt review` 设计
-
-直接输出两个可复制的命令，不需要 TUI。
-
-### 2. 删除 `wt enter` 命令
-
-功能已被 `wt status` TUI 的 Enter 键替代。
-
-### 3. 修改 `wt status` 默认行为
-
-- `wt status` → TUI（默认）
-- `wt status --json` → JSON 输出
-- 非 TTY 环境自动降级到 JSON
-
-### 4. TUI 新增快捷键
+### 8. TUI 更新
 
 | 按键 | 功能 |
 |------|------|
-| `Enter` | 进入 tmux 窗口 |
-| `r` | review |
+| `t` | tail |
 | `d` | 标记 done |
 | `m` | 标记 merged |
+| `a` | **新增：archive（仅 Merged 状态）** |
+
+TUI 现在也显示 Merged 状态的任务，方便执行 archive。
 
 ---
 
-## Session 2 完成的工作 (2026-02-01)
+## 历史 Session 摘要
 
-### 1. 修复 Duration 时间跳动 Bug
+### Session 5 (2026-02-02)
+- `wt review` 重构为 `wt tail`
+- 新增 `wt logs` 命令
+- TUI 快捷键 `r` 改为 `t`
 
-从 Claude Code transcript 读取时间戳，不再使用当前时间计算。
+### Session 4 (2026-02-01)
+- 目录结构重构：`.wt.yaml` → `.wt/config.yaml`
+- 配置项：`claude_command` + `start_args`
+- TUI Enter 智能切换 tmux 窗口
 
-### 2. 简化 Instance 结构
-
-移除 `started_at`, `finished_at`，保留 `session_id`。
-
----
-
-## Session 1 完成的工作
-
-### 1. 新增 `wt review <task>` 命令
-
-### 2. 迁移到 Claude Code Transcript
-
-从 `~/.claude/projects/<escaped_path>/<session_id>.jsonl` 读取。
-
-### 3. Git diff 统计改进
-
-使用 `git diff --shortstat main...HEAD` 显示整个分支变更。
+### Session 1-3 (2026-02-01)
+- 初始实现：review、status TUI、transcript 集成
+- 删除 `wt enter`，功能合并到 TUI Enter 键
 
 ---
 
@@ -176,11 +121,16 @@ cat .wt/logs/ui/3e20cef2.jsonl    # 查看过滤后的日志
 
 | 文件 | 说明 |
 |------|------|
+| `src/commands/archive.rs` | archive 命令实现 |
+| `src/commands/merged.rs` | merged 命令（只关 tmux） |
+| `src/commands/reset.rs` | reset 命令（含备份逻辑） |
 | `src/commands/tail.rs` | tail 命令实现 |
 | `src/commands/logs.rs` | logs 命令实现 |
 | `src/commands/status.rs` | status 命令（含 TUI 调用）|
-| `src/models/config.rs` | 配置解析（含 LogsConfig）|
-| `src/services/transcript.rs` | transcript 解析和过滤服务 |
-| `src/tui/app.rs` | TUI 应用状态和操作 |
-| `src/tui/ui.rs` | TUI 渲染 |
-| `src/tui/mod.rs` | TUI 入口和事件处理 |
+| `src/models/task.rs` | TaskStatus 枚举（含 Archived）|
+| `src/models/config.rs` | 配置解析（含 archive_script）|
+| `src/constants.rs` | 常量（BACKUPS_DIR、branch_name）|
+| `src/services/dependency.rs` | 依赖检查（Archived 视同 Merged）|
+| `src/tui/app.rs` | TUI 应用状态（含 archive 操作）|
+| `src/tui/ui.rs` | TUI 渲染（Merged 状态显示）|
+| `src/tui/mod.rs` | TUI 入口（'a' 键处理）|

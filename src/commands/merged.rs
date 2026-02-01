@@ -1,6 +1,6 @@
 use crate::error::{Result, WtError};
 use crate::models::{TaskStatus, TaskStore};
-use crate::services::{git, tmux};
+use crate::services::tmux;
 
 pub fn execute(name: String) -> Result<()> {
     let mut store = TaskStore::load()?;
@@ -19,30 +19,22 @@ pub fn execute(name: String) -> Result<()> {
         );
     }
 
+    // Only close tmux window, keep worktree and branch for review
     if let Some(instance) = store.get_instance(&name) {
-        println!("Cleaning up resources...");
-
         if let Err(e) = tmux::kill_window(&instance.tmux_session, &instance.tmux_window) {
             eprintln!("  Warning: Failed to kill tmux window: {}", e);
+        } else {
+            println!("  Closed tmux window: {}:{}", instance.tmux_session, instance.tmux_window);
         }
-
-        if let Err(e) = git::remove_worktree(&instance.worktree_path) {
-            eprintln!("  Warning: Failed to remove worktree: {}", e);
-        }
-
-        if let Err(e) = git::delete_branch(&instance.branch) {
-            eprintln!("  Warning: Failed to delete branch: {}", e);
-        }
-
-        println!("  Removed worktree: {}", instance.worktree_path);
-        println!("  Deleted branch: {}", instance.branch);
+        // Keep instance data for archive command
     }
 
     store.set_status(&name, TaskStatus::Merged);
-    store.set_instance(&name, None);
+    // Keep instance (worktree_path, branch) for archive
     store.save_status()?;
 
     println!("Task '{}' marked as merged.", name);
-    println!("Dependent tasks can now be started.");
+    println!("Worktree and branch preserved for review.");
+    println!("Run 'wt archive {}' to cleanup resources.", name);
     Ok(())
 }

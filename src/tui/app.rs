@@ -74,8 +74,8 @@ impl App {
         for task in store.list() {
             let status = store.get_status(task.name());
 
-            // Only show Running and Done tasks
-            if status != TaskStatus::Running && status != TaskStatus::Done {
+            // Show Running, Done, and Merged tasks (for archive)
+            if status != TaskStatus::Running && status != TaskStatus::Done && status != TaskStatus::Merged {
                 continue;
             }
 
@@ -234,9 +234,26 @@ impl App {
         if let Some(task) = self.selected_task() {
             if task.status == TaskStatus::Done {
                 let name = task.name.clone();
-                let mut store = TaskStore::load()?;
-                store.set_status(&name, TaskStatus::Merged);
-                store.save_status()?;
+                crate::commands::merged::execute(name)?;
+                self.refresh()?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Check if selected task can be archived (Merged status)
+    pub fn can_archive(&self) -> bool {
+        self.selected_task()
+            .map(|t| t.status == TaskStatus::Merged)
+            .unwrap_or(false)
+    }
+
+    /// Archive selected task
+    pub fn archive(&mut self) -> Result<()> {
+        if let Some(task) = self.selected_task() {
+            if task.status == TaskStatus::Merged {
+                let name = task.name.clone();
+                crate::commands::archive::execute(name)?;
                 self.refresh()?;
             }
         }

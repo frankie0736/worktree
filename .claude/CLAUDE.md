@@ -30,11 +30,11 @@ src/
 │   ├── start.rs
 │   ├── done.rs
 │   ├── merged.rs
+│   ├── archive.rs
 │   ├── reset.rs
 │   ├── status.rs
 │   ├── tail.rs
-│   ├── logs.rs
-│   └── cleanup.rs
+│   └── logs.rs
 ├── services/
 │   ├── command.rs    # 命令执行辅助 (CommandRunner)
 │   ├── git.rs        # git worktree 操作
@@ -72,6 +72,11 @@ copy_files:
 logs:
   exclude_types: [system, progress]
   exclude_fields: [signature, uuid]
+
+# 归档/重置前的清理脚本
+archive_script: |
+  rm -rf node_modules/
+  rm -rf dist/
 ```
 
 ### Task（任务）
@@ -98,16 +103,17 @@ depends:            # 依赖的任务列表
 ### TaskStatus 状态流转
 
 ```
-○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged
-   (wt start)    (wt done)    (wt merged)
-      ↑______________|
-        (wt reset)
+○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged  →  □ Archived
+   (wt start)    (wt done)    (wt merged)   (wt archive)
+      ↑______________|__________|____________|
+                    (wt reset，会备份)
 ```
 
 ### 依赖规则
 
-- 任务只能在所有依赖都 `Merged` 后才能 `start`
+- 任务只能在所有依赖都 `Merged` 或 `Archived` 后才能 `start`
 - `validate` 会检测循环依赖
+- `reset` 会在清理前备份代码到 `.wt/backups/`
 
 ## 常用命令
 

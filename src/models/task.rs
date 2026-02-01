@@ -8,6 +8,7 @@ pub enum TaskStatus {
     Running,
     Done,
     Merged,
+    Archived,
 }
 
 impl TaskStatus {
@@ -18,6 +19,7 @@ impl TaskStatus {
     /// - Running -> Done
     /// - Running -> Merged (skip done)
     /// - Done -> Merged
+    /// - Merged -> Archived
     pub fn can_transition_to(&self, target: &TaskStatus) -> bool {
         matches!(
             (self, target),
@@ -25,6 +27,7 @@ impl TaskStatus {
                 | (TaskStatus::Running, TaskStatus::Done)
                 | (TaskStatus::Running, TaskStatus::Merged)
                 | (TaskStatus::Done, TaskStatus::Merged)
+                | (TaskStatus::Merged, TaskStatus::Archived)
         )
     }
 
@@ -35,6 +38,7 @@ impl TaskStatus {
             TaskStatus::Running => "running",
             TaskStatus::Done => "done",
             TaskStatus::Merged => "merged",
+            TaskStatus::Archived => "archived",
         }
     }
 
@@ -45,6 +49,7 @@ impl TaskStatus {
             TaskStatus::Running => "●",
             TaskStatus::Done => "◉",
             TaskStatus::Merged => "✓",
+            TaskStatus::Archived => "□",
         }
     }
 }
@@ -130,12 +135,16 @@ mod tests {
         assert!(TaskStatus::Running.can_transition_to(&TaskStatus::Done));
         assert!(TaskStatus::Running.can_transition_to(&TaskStatus::Merged));
         assert!(TaskStatus::Done.can_transition_to(&TaskStatus::Merged));
+        assert!(TaskStatus::Merged.can_transition_to(&TaskStatus::Archived));
 
         // Invalid transitions
         assert!(!TaskStatus::Pending.can_transition_to(&TaskStatus::Done));
         assert!(!TaskStatus::Pending.can_transition_to(&TaskStatus::Merged));
+        assert!(!TaskStatus::Pending.can_transition_to(&TaskStatus::Archived));
         assert!(!TaskStatus::Done.can_transition_to(&TaskStatus::Running));
+        assert!(!TaskStatus::Done.can_transition_to(&TaskStatus::Archived));
         assert!(!TaskStatus::Merged.can_transition_to(&TaskStatus::Pending));
+        assert!(!TaskStatus::Archived.can_transition_to(&TaskStatus::Pending));
     }
 
     #[test]
@@ -144,6 +153,7 @@ mod tests {
         assert_eq!(TaskStatus::Running.display_name(), "running");
         assert_eq!(TaskStatus::Done.display_name(), "done");
         assert_eq!(TaskStatus::Merged.display_name(), "merged");
+        assert_eq!(TaskStatus::Archived.display_name(), "archived");
     }
 
     #[test]
@@ -152,6 +162,7 @@ mod tests {
         assert_eq!(TaskStatus::Running.icon(), "●");
         assert_eq!(TaskStatus::Done.icon(), "◉");
         assert_eq!(TaskStatus::Merged.icon(), "✓");
+        assert_eq!(TaskStatus::Archived.icon(), "□");
     }
 
     #[test]
@@ -172,6 +183,10 @@ mod tests {
             serde_yaml::to_string(&TaskStatus::Merged).unwrap().trim(),
             "merged"
         );
+        assert_eq!(
+            serde_yaml::to_string(&TaskStatus::Archived).unwrap().trim(),
+            "archived"
+        );
     }
 
     #[test]
@@ -191,6 +206,10 @@ mod tests {
         assert_eq!(
             serde_yaml::from_str::<TaskStatus>("merged").unwrap(),
             TaskStatus::Merged
+        );
+        assert_eq!(
+            serde_yaml::from_str::<TaskStatus>("archived").unwrap(),
+            TaskStatus::Archived
         );
     }
 
