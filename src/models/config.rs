@@ -18,6 +18,16 @@ pub struct WtConfig {
     pub copy_files: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub init_script: Option<String>,
+    #[serde(default)]
+    pub logs: LogsConfig,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct LogsConfig {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_types: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_fields: Vec<String>,
 }
 
 fn default_claude_command() -> String {
@@ -140,6 +150,7 @@ init_script: |
             worktree_dir: ".wt/worktrees".to_string(),
             copy_files: vec![".env".to_string()],
             init_script: Some("npm i".to_string()),
+            logs: LogsConfig::default(),
         };
         let yaml = serde_yaml::to_string(&config).unwrap();
 
@@ -147,5 +158,22 @@ init_script: |
         assert!(yaml.contains("start_args:"));
         assert!(yaml.contains("copy_files:"));
         assert!(yaml.contains("init_script:"));
+    }
+
+    #[test]
+    fn test_config_with_logs() {
+        let yaml = r#"
+logs:
+  exclude_types:
+    - system
+    - progress
+  exclude_fields:
+    - signature
+    - parentUuid
+"#;
+        let config = WtConfig::from_str(yaml).unwrap();
+
+        assert_eq!(config.logs.exclude_types, vec!["system", "progress"]);
+        assert_eq!(config.logs.exclude_fields, vec!["signature", "parentUuid"]);
     }
 }

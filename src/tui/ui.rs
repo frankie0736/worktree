@@ -190,10 +190,14 @@ fn draw_footer(frame: &mut Frame, area: Rect, app: &App) {
 
         // Context-sensitive actions based on selected task
         if let Some(task) = app.selected_task() {
+            // t (tail) available for Running and Done
+            if task.status == TaskStatus::Running || task.status == TaskStatus::Done {
+                spans.push(Span::styled("t", Style::default().fg(Color::Yellow)));
+                spans.push(Span::raw(" tail  "));
+            }
+
             if task.status == TaskStatus::Done {
-                // Done: r (review), m (merged)
-                spans.push(Span::styled("r", Style::default().fg(Color::Yellow)));
-                spans.push(Span::raw(" review  "));
+                // Done: m (merged)
                 spans.push(Span::styled("m", Style::default().fg(Color::Yellow)));
                 spans.push(Span::raw(" merged  "));
             } else if task.status == TaskStatus::Running && !task.tmux_alive {

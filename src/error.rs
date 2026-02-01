@@ -67,20 +67,23 @@ pub enum WtError {
         status: String,
     },
 
-    #[error("Cannot review task '{0}': task is still running")]
-    CannotReviewRunning(String),
+    #[error("Task '{0}' has not been started")]
+    TaskNotStarted(String),
 
-    #[error("Cannot review task '{0}': worktree no longer exists")]
+    #[error("Task '{0}': worktree no longer exists")]
     WorktreeNotFound(String),
 
-    #[error("Cannot review task '{0}': session transcript not found")]
+    #[error("Task '{0}': transcript not found")]
     TranscriptNotFound(String),
 
-    #[error("Cannot review task '{0}': task has no session ID (started with older wt version)")]
+    #[error("Task '{0}': no session ID (started with older wt version)")]
     NoSessionId(String),
 
-    #[error("Task '{0}' is not in Done state")]
-    TaskNotDone(String),
+    #[error("Task '{0}': failed to parse transcript")]
+    TranscriptParseFailed(String),
+
+    #[error("Task '{0}': no assistant messages found")]
+    NoAssistantMessages(String),
 }
 
 pub type Result<T> = std::result::Result<T, WtError>;

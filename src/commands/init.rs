@@ -61,6 +61,36 @@ tmux_session: {}
 # copy_files:
 #   - .env
 #   - .env.local
+
+# ============================================
+# 日志配置 (wt logs)
+# ============================================
+
+# 过滤规则，用于 wt logs 命令生成调试日志
+# 默认不过滤，取消注释以启用
+# logs:
+#   exclude_types:
+#     - system
+#     - progress
+#     - file-history-snapshot
+#   exclude_fields:
+#     - signature
+#     - cwd
+#     - gitBranch
+#     - permissionMode
+#     - sessionId
+#     - id
+#     - model
+#     - tool_use_id
+#     - timestamp
+#     - version
+#     - usage
+#     - parentUuid
+#     - uuid
+#     - isSidechain
+#     - userType
+#     - slug
+#     - thinkingMetadata
 "#,
         project_name
     )

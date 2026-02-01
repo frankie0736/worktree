@@ -18,6 +18,9 @@ pub const BRANCH_PREFIX: &str = "wt/";
 /// Status file for runtime state
 pub const STATUS_FILE: &str = ".wt/status.json";
 
+/// Logs directory for debug output
+pub const LOGS_DIR: &str = ".wt/logs";
+
 /// Idle threshold in seconds (for status command)
 pub const IDLE_THRESHOLD_SECS: u64 = 120;
 

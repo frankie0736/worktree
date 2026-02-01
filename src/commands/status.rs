@@ -88,9 +88,9 @@ fn handle_tui_action(action: crate::tui::TuiAction) -> Result<()> {
             println!("cd {} && {} -r {}", worktree, claude_command, session_id);
             Ok(())
         }
-        TuiAction::Review { name } => {
-            // Execute review command
-            crate::commands::review::execute(name, false)
+        TuiAction::Tail { name } => {
+            // Execute tail command (default: 1 turn)
+            crate::commands::tail::execute(name, 1)
         }
     }
 }

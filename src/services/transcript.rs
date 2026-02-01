@@ -1,10 +1,11 @@
 //! Transcript service for reading Claude Code session transcripts.
 
 use std::fs::File;
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
+use serde_json::Value;
 
 /// Metrics extracted from transcript
 #[derive(Debug, Default, Clone)]
@@ -180,6 +181,135 @@ struct ContentItem {
     r#type: String,
     #[serde(default)]
     text: Option<String>,
+    #[serde(default)]
+    thinking: Option<String>,
+}
+
+/// Get the last N assistant messages from a transcript.
+/// Extracts text content first, falls back to thinking content if no text.
+pub fn get_last_messages(path: &Path, n: usize) -> Option<Vec<String>> {
+    let file = File::open(path).ok()?;
+    let reader = BufReader::new(file);
+
+    let mut messages: Vec<String> = Vec::new();
+
+    for line in reader.lines() {
+        let line = line.ok()?;
+        if line.is_empty() {
+            continue;
+        }
+
+        if let Ok(entry) = serde_json::from_str::<TranscriptEntry>(&line) {
+            if entry.r#type == "assistant" {
+                if let Some(msg) = entry.message {
+                    if let Some(content) = msg.content {
+                        // Try to get text content first
+                        let text_parts: Vec<String> = content
+                            .iter()
+                            .filter(|item| item.r#type == "text")
+                            .filter_map(|item| item.text.clone())
+                            .collect();
+
+                        if !text_parts.is_empty() {
+                            messages.push(text_parts.join("\n"));
+                        } else {
+                            // Fall back to thinking content
+                            let thinking_parts: Vec<String> = content
+                                .iter()
+                                .filter(|item| item.r#type == "thinking")
+                                .filter_map(|item| item.thinking.clone())
+                                .collect();
+
+                            if !thinking_parts.is_empty() {
+                                messages.push(thinking_parts.join("\n"));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Return last N messages
+    let start = messages.len().saturating_sub(n);
+    Some(messages[start..].to_vec())
+}
+
+/// Extract filtered transcript to a log file.
+/// Returns the number of entries written.
+pub fn extract_to_log(
+    transcript_path: &Path,
+    log_path: &Path,
+    exclude_types: &[String],
+    exclude_fields: &[String],
+) -> Option<usize> {
+    let file = File::open(transcript_path).ok()?;
+    let reader = BufReader::new(file);
+
+    // Ensure parent directory exists
+    if let Some(parent) = log_path.parent() {
+        std::fs::create_dir_all(parent).ok()?;
+    }
+
+    let mut output = File::create(log_path).ok()?;
+    let mut count = 0;
+
+    for line in reader.lines() {
+        let line = line.ok()?;
+        if line.is_empty() {
+            continue;
+        }
+
+        // Parse as generic JSON
+        let mut json: Value = serde_json::from_str(&line).ok()?;
+
+        // Check if type should be excluded
+        if let Some(entry_type) = json.get("type").and_then(|v| v.as_str()) {
+            if exclude_types.iter().any(|t| t == entry_type) {
+                continue;
+            }
+        }
+
+        // Remove excluded fields recursively
+        remove_fields(&mut json, exclude_fields);
+
+        // Write filtered entry
+        writeln!(output, "{}", serde_json::to_string(&json).ok()?).ok()?;
+        count += 1;
+    }
+
+    Some(count)
+}
+
+/// Recursively remove specified fields from a JSON value.
+fn remove_fields(value: &mut Value, fields: &[String]) {
+    match value {
+        Value::Object(map) => {
+            // Remove specified fields
+            for field in fields {
+                map.remove(field);
+            }
+            // Recurse into remaining values
+            for v in map.values_mut() {
+                remove_fields(v, fields);
+            }
+        }
+        Value::Array(arr) => {
+            for v in arr.iter_mut() {
+                remove_fields(v, fields);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Generate log file path for a task.
+/// Structure: .wt/logs/<task>/<session_id_prefix>.jsonl
+pub fn log_path(task_name: &str, session_id: &str) -> PathBuf {
+    let short_session = &session_id[..8.min(session_id.len())];
+    PathBuf::from(crate::constants::LOGS_DIR)
+        .join(task_name)
+        .join(format!("{}.jsonl", short_session))
 }
 
 #[cfg(test)]

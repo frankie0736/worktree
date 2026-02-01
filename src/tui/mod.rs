@@ -133,9 +133,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> Result<TuiA
                             }
                         }
 
-                        // Review (Done only)
-                        KeyCode::Char('r') => {
-                            if let Some(action) = app.review_action() {
+                        // Tail (Running or Done)
+                        KeyCode::Char('t') => {
+                            if let Some(action) = app.tail_action() {
                                 return Ok(action);
                             }
                         }

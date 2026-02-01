@@ -83,13 +83,16 @@ pub enum Commands {
         json: bool,
     },
 
-    /// Review task results and optionally continue conversation
-    Review {
-        /// Task name to review
+    /// View last assistant messages from task transcript (JSON output)
+    Tail {
+        /// Task name
         name: String,
 
-        /// Output as JSON for programmatic use
-        #[arg(long)]
-        json: bool,
+        /// Number of turns to show (default: 1)
+        #[arg(short = 'n', default_value = "1")]
+        count: usize,
     },
+
+    /// Generate filtered logs for all tasks
+    Logs,
 }

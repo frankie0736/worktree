@@ -21,7 +21,8 @@ wt init                                    # 初始化
 wt create --json '{"name": "auth", "depends": [], "description": "实现认证"}'
 wt start auth                              # 启动任务
 wt status                                  # 查看状态 (TUI)
-wt review auth                             # 查看结果
+wt tail auth                               # 查看最后输出
+wt logs                                    # 生成调试日志
 wt done auth                               # 标记完成
 wt merged auth                             # PR 合并后
 ```
@@ -37,7 +38,8 @@ wt merged auth                             # PR 合并后
 | `wt next [--json]` | 显示可启动任务 |
 | `wt start <name>` | 启动任务 |
 | `wt status [--json]` | 查看状态 (默认 TUI) |
-| `wt review <name> [--json]` | 查看任务结果 |
+| `wt tail <name> [-n N]` | 查看最后 N 条输出 (JSON) |
+| `wt logs` | 生成所有任务的过滤日志 |
 | `wt done <name>` | 标记完成 |
 | `wt merged <name>` | 标记已合并 |
 | `wt reset <name>` | 重置任务到 pending |
@@ -49,7 +51,7 @@ wt merged auth                             # PR 合并后
 |------|------|
 | `↑↓` / `jk` | 导航 |
 | `Enter` | 进入 tmux 窗口 |
-| `r` | review (Done 任务) |
+| `t` | tail (查看输出) |
 | `d` | 标记 done (agent 已退出) |
 | `m` | 标记 merged |
 | `q` | 退出 |
@@ -80,6 +82,11 @@ tmux_session: my-project
 # init_script: npm install
 # copy_files:
 #   - .env
+
+# 日志过滤 (wt logs)
+# logs:
+#   exclude_types: [system, progress]
+#   exclude_fields: [signature, uuid]
 ```
 
 ## 任务状态

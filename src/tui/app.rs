@@ -23,8 +23,8 @@ pub enum TuiAction {
         session_id: String,
         claude_command: String,
     },
-    /// Review a done task
-    Review { name: String },
+    /// Tail a task's transcript
+    Tail { name: String },
 }
 
 /// Task with computed metrics for display
@@ -291,11 +291,12 @@ impl App {
         }
     }
 
-    /// Get action to review selected task
-    pub fn review_action(&self) -> Option<TuiAction> {
+    /// Get action to tail selected task's transcript
+    pub fn tail_action(&self) -> Option<TuiAction> {
         self.selected_task().and_then(|task| {
-            if task.status == TaskStatus::Done {
-                Some(TuiAction::Review {
+            // Can tail Running or Done tasks
+            if task.status == TaskStatus::Running || task.status == TaskStatus::Done {
+                Some(TuiAction::Tail {
                     name: task.name.clone(),
                 })
             } else {

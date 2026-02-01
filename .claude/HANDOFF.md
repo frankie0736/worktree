@@ -1,5 +1,76 @@
 # Handoff 文档 - wt 开发进度
 
+## Session 5 完成的工作 (2026-02-02)
+
+### 1. 重构 `wt review` 为 `wt tail`
+
+**设计变更**：
+- 删除 `wt review` 命令
+- 新增 `wt tail <task> [-n <count>] [--json]` 命令
+- 专注输出 transcript 中的 assistant 消息，移除 metrics/stats
+
+**命令用法**：
+```bash
+wt tail auth        # 输出最后 1 个 turn
+wt tail auth -n 3   # 输出最后 3 个 turns
+```
+
+**输出格式**：永远输出 JSON 数组
+```json
+[{"role": "assistant", "content": "..."}]
+```
+
+**内容提取**：优先提取 text，若无 text 则提取 thinking（包含任务摘要）
+
+**状态处理**：
+- Pending：错误退出
+- Running/Done/Merged：正常输出 transcript 内容
+
+### 2. 更新 TUI 快捷键
+
+| 按键 | 功能 |
+|------|------|
+| `t` | tail（替代原来的 `r` review） |
+| `d` | 标记 done |
+| `m` | 标记 merged |
+
+### 3. 新增 `wt logs` 命令
+
+独立命令生成所有任务的过滤日志，与 `tail` 解耦。
+
+**目录结构**：
+```
+.wt/logs/
+├── ui/
+│   └── 3e20cef2.jsonl
+└── auth/
+    └── a1b2c3d4.jsonl
+```
+
+**配置**（`.wt/config.yaml`）：
+```yaml
+logs:
+  exclude_types:
+    - system
+    - progress
+  exclude_fields:
+    - signature
+    - parentUuid
+```
+
+**使用**：
+```bash
+wt logs                           # 生成/更新所有任务的日志
+cat .wt/logs/ui/3e20cef2.jsonl    # 查看过滤后的日志
+```
+
+### 4. 错误类型重构
+
+删除：`CannotReviewRunning`, `TaskNotDone`
+新增：`TaskNotStarted`, `TranscriptParseFailed`, `NoAssistantMessages`
+
+---
+
 ## Session 4 完成的工作 (2026-02-01)
 
 ### 1. 目录结构重构
@@ -96,7 +167,7 @@
 
 ## 已知问题
 
-1. **旧任务无法 review**：没有 session_id 的任务无法 review
+1. **旧任务无法 tail**：没有 session_id 的任务无法 tail
 2. **context_percent 计算**：使用固定 200k context window
 
 ---
@@ -105,9 +176,11 @@
 
 | 文件 | 说明 |
 |------|------|
-| `src/commands/review.rs` | review 命令实现 |
+| `src/commands/tail.rs` | tail 命令实现 |
+| `src/commands/logs.rs` | logs 命令实现 |
 | `src/commands/status.rs` | status 命令（含 TUI 调用）|
-| `src/services/transcript.rs` | transcript 解析服务 |
+| `src/models/config.rs` | 配置解析（含 LogsConfig）|
+| `src/services/transcript.rs` | transcript 解析和过滤服务 |
 | `src/tui/app.rs` | TUI 应用状态和操作 |
 | `src/tui/ui.rs` | TUI 渲染 |
 | `src/tui/mod.rs` | TUI 入口和事件处理 |

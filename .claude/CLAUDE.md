@@ -32,7 +32,8 @@ src/
 │   ├── merged.rs
 │   ├── reset.rs
 │   ├── status.rs
-│   ├── review.rs
+│   ├── tail.rs
+│   ├── logs.rs
 │   └── cleanup.rs
 ├── services/
 │   ├── command.rs    # 命令执行辅助 (CommandRunner)
@@ -66,6 +67,11 @@ worktree_dir: .wt/worktrees
 init_script: npm install
 copy_files:
   - .env
+
+# 日志过滤配置 (wt logs)
+logs:
+  exclude_types: [system, progress]
+  exclude_fields: [signature, uuid]
 ```
 
 ### Task（任务）
