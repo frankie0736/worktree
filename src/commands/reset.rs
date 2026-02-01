@@ -4,7 +4,7 @@ use std::path::Path;
 
 use chrono::Utc;
 
-use crate::constants::BACKUPS_DIR;
+use crate::constants::{branch_pattern, BACKUPS_DIR};
 use crate::error::{Result, WtError};
 use crate::models::{TaskStatus, TaskStore, WtConfig};
 use crate::services::{dependency, git, tmux, workspace::WorkspaceInitializer};
@@ -108,7 +108,7 @@ fn cleanup_orphaned_resources(task_name: &str, config: &WtConfig) -> Result<bool
         .to_string();
 
     let worktree_exists = Path::new(&worktree_path).exists();
-    let branches = git::find_branches(&format!("wt/{}-*", task_name));
+    let branches = git::find_branches(&branch_pattern(task_name));
 
     if !worktree_exists && branches.is_empty() {
         return Ok(false); // Nothing to clean up

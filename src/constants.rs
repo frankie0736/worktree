@@ -34,6 +34,12 @@ pub fn branch_name(task_name: &str, session_id: &str) -> String {
     format!("{}{}-{}", BRANCH_PREFIX, task_name, prefix)
 }
 
+/// Generate glob pattern for finding task-related branches
+/// Example: task_name = "auth" → "wt/auth-*"
+pub fn branch_pattern(task_name: &str) -> String {
+    format!("{}{}-*", BRANCH_PREFIX, task_name)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -48,5 +54,11 @@ mod tests {
     fn test_branch_name_short_session_id() {
         assert_eq!(branch_name("auth", "ab"), "wt/auth-ab");
         assert_eq!(branch_name("auth", ""), "wt/auth-");
+    }
+
+    #[test]
+    fn test_branch_pattern() {
+        assert_eq!(branch_pattern("auth"), "wt/auth-*");
+        assert_eq!(branch_pattern("feature-x"), "wt/feature-x-*");
     }
 }
