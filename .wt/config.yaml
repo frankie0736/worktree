@@ -7,7 +7,7 @@
 
 # wt start 执行的参数
 # 支持模板变量: ${task}, ${branch}, ${worktree}
-start_args: --verbose --output-format=stream-json --input-format=stream-json -p "先阅读 @REFACTOR_CONTEXT.md 了解整体背景，然后完成 @.wt/tasks/${task}.md 中的任务"
+start_args: --verbose --output-format=stream-json --input-format=stream-json -p "先阅读 @REFACTOR_CONTEXT.md 了解整体背景，然后完成 @.wt/tasks/${task}.md 中的任务。完成后请 commit 你的改动。"
 
 # ============================================
 # 可选配置

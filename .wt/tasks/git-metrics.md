@@ -19,6 +19,21 @@ depends:
 
 ## 任务
 
+### 0. 修复 `parse_diff_stats` bug
+
+`src/services/git.rs` 中的 `parse_diff_stats` 函数有 bug：当 `main...HEAD` 返回空字符串（没有 commit）时，返回 `Some((0, 0))` 而不是 `None`，导致不会 fallback 到 `diff HEAD` 显示未提交的改动。
+
+修复：
+```rust
+fn parse_diff_stats(output: &str) -> Option<(i32, i32)> {
+    let output = output.trim();
+    if output.is_empty() {
+        return None;  // 改为 None，触发 fallback 显示未提交改动
+    }
+    // ... 其余不变
+}
+```
+
 ### 1. 在 `src/services/git.rs` 添加：
 
 ```rust
