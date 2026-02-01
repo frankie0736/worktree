@@ -94,6 +94,24 @@ impl TaskStore {
         self.tasks.get(name)
     }
 
+    /// Ensure task exists, otherwise return TaskNotFound error
+    pub fn ensure_exists(&self, name: &str) -> Result<&Task> {
+        self.get(name)
+            .ok_or_else(|| WtError::TaskNotFound(name.to_string()))
+    }
+
+    /// Validate that status transition is allowed
+    pub fn validate_transition(&self, name: &str, target: TaskStatus) -> Result<()> {
+        let current = self.get_status(name);
+        if !current.can_transition_to(&target) {
+            return Err(WtError::InvalidStateTransition {
+                from: current.display_name().to_string(),
+                to: target.display_name().to_string(),
+            });
+        }
+        Ok(())
+    }
+
     /// List all tasks sorted by name
     pub fn list(&self) -> Vec<&Task> {
         let mut tasks: Vec<_> = self.tasks.values().collect();
@@ -619,5 +637,51 @@ mod tests {
         store.set_instance("test", Some(instance));
         assert!(store.get_instance("test").is_some());
         assert_eq!(store.get_instance("test").unwrap().branch, "wt/test");
+    }
+
+    // ==================== ensure_exists Tests ====================
+
+    #[test]
+    fn test_ensure_exists_found() {
+        let mut store = TaskStore::default();
+        store.tasks.insert("test".to_string(), create_test_task("test", vec![]));
+
+        let result = store.ensure_exists("test");
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().name(), "test");
+    }
+
+    #[test]
+    fn test_ensure_exists_not_found() {
+        let store = TaskStore::default();
+
+        let result = store.ensure_exists("nonexistent");
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("nonexistent"));
+        assert!(err.contains("not found"));
+    }
+
+    // ==================== validate_transition Tests ====================
+
+    #[test]
+    fn test_validate_transition_valid() {
+        let mut store = TaskStore::default();
+        store.set_status("test", TaskStatus::Running);
+
+        let result = store.validate_transition("test", TaskStatus::Done);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_transition_invalid() {
+        let store = TaskStore::default();
+        // Default is Pending, cannot transition to Done directly
+
+        let result = store.validate_transition("test", TaskStatus::Done);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("pending"));
+        assert!(err.contains("done"));
     }
 }

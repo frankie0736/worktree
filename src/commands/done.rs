@@ -1,22 +1,13 @@
-use crate::error::{Result, WtError};
+use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore};
 use crate::services::tmux;
 
 pub fn execute(name: String) -> Result<()> {
     let mut store = TaskStore::load()?;
 
-    // Check task exists
-    let _task = store
-        .get(&name)
-        .ok_or_else(|| WtError::TaskNotFound(name.clone()))?;
-
-    let current_status = store.get_status(&name);
-    if !current_status.can_transition_to(&TaskStatus::Done) {
-        return Err(WtError::InvalidStateTransition {
-            from: current_status.display_name().to_string(),
-            to: TaskStatus::Done.display_name().to_string(),
-        });
-    }
+    // Check task exists and validate transition
+    store.ensure_exists(&name)?;
+    store.validate_transition(&name, TaskStatus::Done)?;
 
     // Close tmux window if still alive
     if let Some(instance) = store.get_instance(&name) {

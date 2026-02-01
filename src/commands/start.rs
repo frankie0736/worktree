@@ -77,9 +77,7 @@ fn execute_single(name: String) -> Result<()> {
     let mut store = TaskStore::load()?;
 
     // Check task exists
-    let _task = store
-        .get(&name)
-        .ok_or_else(|| WtError::TaskNotFound(name.clone()))?;
+    store.ensure_exists(&name)?;
 
     // Check status from StatusStore
     if store.get_status(&name) == TaskStatus::Running {

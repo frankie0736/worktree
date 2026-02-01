@@ -18,9 +18,7 @@ pub fn execute(name: String, count: usize) -> Result<()> {
     let store = TaskStore::load()?;
 
     // Check task exists
-    let _task = store
-        .get(&name)
-        .ok_or_else(|| WtError::TaskNotFound(name.clone()))?;
+    store.ensure_exists(&name)?;
 
     // Check status - only Pending is not allowed
     let status = store.get_status(&name);

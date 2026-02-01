@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::error::{Result, WtError};
+use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore, WtConfig};
 use crate::services::{git, tmux, workspace::WorkspaceInitializer};
 
@@ -8,18 +8,9 @@ pub fn execute(name: String) -> Result<()> {
     let config = WtConfig::load()?;
     let mut store = TaskStore::load()?;
 
-    // Check task exists
-    let _task = store
-        .get(&name)
-        .ok_or_else(|| WtError::TaskNotFound(name.clone()))?;
-
-    let current_status = store.get_status(&name);
-    if !current_status.can_transition_to(&TaskStatus::Archived) {
-        return Err(WtError::InvalidStateTransition {
-            from: current_status.display_name().to_string(),
-            to: "archived".to_string(),
-        });
-    }
+    // Check task exists and validate transition
+    store.ensure_exists(&name)?;
+    store.validate_transition(&name, TaskStatus::Archived)?;
 
     // Run archive script if configured
     if let Some(ref script) = config.archive_script {

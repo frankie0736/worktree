@@ -14,9 +14,7 @@ pub fn execute(name: String) -> Result<()> {
     let mut store = TaskStore::load()?;
 
     // Check task exists
-    let _task = store
-        .get(&name)
-        .ok_or_else(|| WtError::TaskNotFound(name.clone()))?;
+    store.ensure_exists(&name)?;
 
     let current_status = store.get_status(&name);
 
