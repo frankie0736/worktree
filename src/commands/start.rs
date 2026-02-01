@@ -112,12 +112,6 @@ fn execute_single(name: String) -> Result<()> {
         println!("  Copied: {}", file);
     }
 
-    // Run init script if configured
-    if let Some(ref script) = config.init_script {
-        println!("  Running init script...");
-        initializer.run_init_script(script)?;
-    }
-
     if !tmux::session_exists(&config.tmux_session) {
         tmux::create_session(&config.tmux_session)?;
     }
@@ -135,7 +129,17 @@ fn execute_single(name: String) -> Result<()> {
         config.claude_command, expanded_args, session_id
     );
 
-    tmux::create_window(&config.tmux_session, &name, &worktree_path, &agent_cmd)?;
+    // Build full command: init_script && agent_cmd (if init_script configured)
+    let full_cmd = match &config.init_script {
+        Some(script) => format!("({}) && {}", script, agent_cmd),
+        None => agent_cmd,
+    };
+
+    tmux::create_window(&config.tmux_session, &name, &worktree_path, &full_cmd)?;
+
+    if config.init_script.is_some() {
+        println!("  Init script will run in tmux window");
+    }
 
     // Update status in StatusStore
     store.set_status(&name, TaskStatus::Running);
