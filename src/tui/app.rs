@@ -253,10 +253,8 @@ impl App {
                 let name = task.name.clone();
 
                 // Close tmux window if still alive
-                if task.tmux_alive {
-                    if let (Some(session), Some(window)) = (&task.tmux_session, &task.tmux_window) {
-                        crate::services::tmux::kill_window(session, window).ok();
-                    }
+                if let (Some(session), Some(window)) = (&task.tmux_session, &task.tmux_window) {
+                    tmux::kill_window_if_exists(session, window).ok();
                 }
 
                 let mut store = TaskStore::load()?;

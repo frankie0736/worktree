@@ -11,8 +11,7 @@ pub fn execute(name: String) -> Result<()> {
 
     // Close tmux window if still alive
     if let Some(instance) = store.get_instance(&name) {
-        if tmux::window_exists(&instance.tmux_session, &instance.tmux_window) {
-            tmux::kill_window(&instance.tmux_session, &instance.tmux_window)?;
+        if tmux::kill_window_if_exists(&instance.tmux_session, &instance.tmux_window)? {
             println!("Closed tmux window {}:{}", instance.tmux_session, instance.tmux_window);
         }
     }

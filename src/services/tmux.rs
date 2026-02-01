@@ -32,3 +32,13 @@ pub fn window_exists(session: &str, window: &str) -> bool {
     let target = format!("{}:{}", session, window);
     CommandRunner::tmux().success(&["select-window", "-t", &target])
 }
+
+/// 如果窗口存在则关闭，返回是否执行了关闭操作
+pub fn kill_window_if_exists(session: &str, window: &str) -> Result<bool> {
+    if window_exists(session, window) {
+        kill_window(session, window)?;
+        Ok(true)
+    } else {
+        Ok(false)
+    }
+}
