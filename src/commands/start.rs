@@ -7,7 +7,72 @@ use crate::error::{Result, WtError};
 use crate::models::{Instance, TaskStatus, TaskStore, WtConfig};
 use crate::services::{dependency, git, tmux, workspace::WorkspaceInitializer};
 
-pub fn execute(name: String) -> Result<()> {
+pub fn execute(name: Option<String>, all: bool) -> Result<()> {
+    if all {
+        execute_all()
+    } else {
+        let name = name.ok_or_else(|| {
+            WtError::InvalidInput("Task name required (or use --all to start all ready tasks)".into())
+        })?;
+        execute_single(name)
+    }
+}
+
+/// Start all tasks that are ready (pending with all dependencies merged)
+fn execute_all() -> Result<()> {
+    let store = TaskStore::load()?;
+    let tasks = store.list();
+
+    // Find all ready tasks (pending with all deps merged/archived)
+    let ready_tasks: Vec<String> = tasks
+        .iter()
+        .filter(|task| {
+            if store.get_status(task.name()) != TaskStatus::Pending {
+                return false;
+            }
+            task.depends().iter().all(|dep| {
+                let status = store.get_status(dep);
+                status == TaskStatus::Merged || status == TaskStatus::Archived
+            })
+        })
+        .map(|task| task.name().to_string())
+        .collect();
+
+    if ready_tasks.is_empty() {
+        println!("No tasks ready to start.");
+        println!("Use 'wt next' to see blocked tasks.");
+        return Ok(());
+    }
+
+    println!("Starting {} task(s)...\n", ready_tasks.len());
+
+    let mut started = 0;
+    let mut failed = 0;
+
+    for task_name in ready_tasks {
+        print!("Starting '{}'... ", task_name);
+        match execute_single(task_name.clone()) {
+            Ok(()) => {
+                started += 1;
+            }
+            Err(e) => {
+                println!("FAILED: {}", e);
+                failed += 1;
+            }
+        }
+    }
+
+    println!("\nSummary: {} started, {} failed", started, failed);
+
+    if started > 0 {
+        println!("\nUse 'wt status' to monitor tasks.");
+    }
+
+    Ok(())
+}
+
+/// Start a single task
+fn execute_single(name: String) -> Result<()> {
     let config = WtConfig::load()?;
     let mut store = TaskStore::load()?;
 
@@ -90,13 +155,9 @@ pub fn execute(name: String) -> Result<()> {
 
     let relative_path = format!("{}/{}", config.worktree_dir, name);
 
-    println!("Task '{}' started.", name);
-    println!();
+    println!("OK");
     println!("  Worktree: {}", relative_path);
     println!("  Branch:   {}", branch);
-    println!();
-    println!("进入工作区:");
-    println!("  wt status          # TUI 中按 Enter 进入 tmux 窗口");
-    println!("  cd {}    # 或直接进入目录", relative_path);
+
     Ok(())
 }

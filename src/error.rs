@@ -41,6 +41,9 @@ pub enum WtError {
     #[error("Invalid JSON: {0}")]
     InvalidJson(String),
 
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
+
     #[error("IO error during {operation} on '{path}': {message}")]
     Io {
         operation: String,

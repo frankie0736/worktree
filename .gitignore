@@ -24,3 +24,10 @@ mockup-project/
 .claude/hooks/fdd-*
 .claude/skills/fdd/
 .fdd/
+
+# wt - Worktree Task Manager
+# https://github.com/anthropics/wt
+.wt/status.json
+.wt/worktrees/
+.wt/backups/
+.wt/logs/

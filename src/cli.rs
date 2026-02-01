@@ -40,8 +40,12 @@ pub enum Commands {
 
     /// Start a task (creates worktree and tmux window)
     Start {
-        /// Task name to start
-        name: String,
+        /// Task name to start (required unless --all is used)
+        name: Option<String>,
+
+        /// Start all tasks that are ready (no unmerged dependencies)
+        #[arg(long)]
+        all: bool,
     },
 
     /// Mark a task as done (ready for review)

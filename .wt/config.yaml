@@ -1,0 +1,73 @@
+# wt 配置文件
+# 文档: https://github.com/anthropics/wt
+
+# ============================================
+# 主要配置
+# ============================================
+
+# wt start 执行的参数
+# 支持模板变量: ${task}, ${branch}, ${worktree}
+start_args: --verbose --output-format=stream-json --input-format=stream-json -p "先阅读 @REFACTOR_CONTEXT.md 了解整体背景，然后完成 @.wt/tasks/${task}.md 中的任务"
+
+# ============================================
+# 可选配置
+# ============================================
+
+# Claude CLI 命令
+# 默认: claude
+# 如果你使用别名或想添加全局 flags，在这里配置
+# 示例: ccc, claude --yolo, /path/to/claude
+claude_command: ccc
+
+# tmux session 名称
+# 默认: 项目目录名
+tmux_session: worktree
+
+# Worktree 存放目录
+# 默认: .wt/worktrees
+# 支持相对路径（相对于项目根目录）和绝对路径
+# worktree_dir: .wt/worktrees
+
+# 初始化脚本 (在每个新 worktree 中执行)
+# Rust 项目：确保编译通过
+init_script: cargo check
+
+# 需要复制到 worktree 的文件
+# 这些文件不会被 git checkout 带过去
+# copy_files:
+#   - .env
+#   - .env.local
+
+# 归档/重置前的清理脚本
+# Rust 项目：删除 target/ 减少备份体积
+archive_script: rm -rf target/
+
+# ============================================
+# 日志配置 (wt logs)
+# ============================================
+
+# 过滤规则，用于 wt logs 命令生成调试日志
+# 默认不过滤，取消注释以启用
+logs:
+  exclude_types:
+    - system
+    - progress
+    - file-history-snapshot
+  exclude_fields:
+    - signature
+    - cwd
+    - gitBranch
+    - permissionMode
+    - sessionId
+    - id
+    - model
+    - tool_use_id
+    - timestamp
+    - version
+    - usage
+    - parentUuid
+    - uuid
+    - isSidechain
+    - userType
+    - slug
+    - thinkingMetadata
