@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::constants::TASKS_DIR;
 use crate::error::{Result, WtError};
 use crate::models::{Instance, StatusStore, Task, TaskFrontmatter, TaskInput, TaskStatus};
+use crate::services::tmux;
 
 #[derive(Debug, Default)]
 pub struct TaskStore {
@@ -144,6 +145,35 @@ impl TaskStore {
     /// Save status to .wt/status.json
     pub fn save_status(&self) -> Result<()> {
         self.status.save()
+    }
+
+    /// Check if a task should be auto-marked as Done.
+    /// Condition: status is Running but tmux window is closed.
+    /// Returns: whether auto-mark was performed.
+    pub fn auto_mark_done_if_needed(&mut self, task_name: &str) -> Result<bool> {
+        let status = self.get_status(task_name);
+        if status != TaskStatus::Running {
+            return Ok(false);
+        }
+
+        let state = match self.status.tasks.get(task_name) {
+            Some(s) => s,
+            None => return Ok(false),
+        };
+
+        let instance = match &state.instance {
+            Some(inst) => inst,
+            None => return Ok(false),
+        };
+
+        // Check if tmux window still exists
+        if tmux::window_exists(&instance.tmux_session, &instance.tmux_window) {
+            return Ok(false);
+        }
+
+        // Window closed, auto-mark as Done
+        self.set_status(task_name, TaskStatus::Done);
+        Ok(true)
     }
 
     /// Create a new task from JSON input

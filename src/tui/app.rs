@@ -72,33 +72,36 @@ impl App {
     pub fn refresh(&mut self) -> Result<()> {
         let mut store = TaskStore::load()?;
         let mut tasks = Vec::new();
-        let mut tasks_to_mark_done: Vec<String> = Vec::new();
+        let mut status_changed = false;
 
-        for task in store.list() {
-            let status = store.get_status(task.name());
+        // Collect task names first to avoid borrow conflict
+        let task_names: Vec<String> = store.list().iter().map(|t| t.name().to_string()).collect();
+
+        for task_name in &task_names {
+            // Auto-mark as Done if Running but tmux window is closed
+            if store.auto_mark_done_if_needed(task_name)? {
+                status_changed = true;
+            }
+
+            let status = store.get_status(task_name);
 
             // Show Running, Done, and Merged tasks (for archive)
             if status != TaskStatus::Running && status != TaskStatus::Done && status != TaskStatus::Merged {
                 continue;
             }
 
+            let task = store.get(task_name).unwrap();
             let instance = store.get_instance(task.name());
             let worktree_path = instance.map(|i| i.worktree_path.clone());
 
-            // Tmux status - check first for auto-done detection
+            // Tmux status
             let tmux_alive = if let Some(inst) = instance {
                 tmux::window_exists(&inst.tmux_session, &inst.tmux_window)
             } else {
                 false
             };
 
-            // Auto-mark as Done if Running but tmux window is gone
-            let final_status = if status == TaskStatus::Running && !tmux_alive {
-                tasks_to_mark_done.push(task.name().to_string());
-                TaskStatus::Done
-            } else {
-                status
-            };
+            let final_status = status;
 
             // Parse transcript for metrics (duration, context, etc.)
             let transcript_metrics = instance
@@ -184,11 +187,8 @@ impl App {
             });
         }
 
-        // Auto-mark tasks as Done (Running but tmux window gone)
-        if !tasks_to_mark_done.is_empty() {
-            for name in &tasks_to_mark_done {
-                store.set_status(name, TaskStatus::Done);
-            }
+        // Save status if any task was auto-marked as Done
+        if status_changed {
             store.save_status()?;
         }
 

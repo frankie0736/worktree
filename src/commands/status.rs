@@ -166,30 +166,32 @@ fn display_status(json: bool) -> Result<()> {
     let mut done_count = 0;
     let mut total_additions = 0;
     let mut total_deletions = 0;
-    let mut tasks_to_mark_done: Vec<String> = Vec::new();
+    let mut status_changed = false;
 
-    for task in store.list() {
-        let status = store.get_status(task.name());
+    // Collect task names first to avoid borrow conflict
+    let task_names: Vec<String> = store.list().iter().map(|t| t.name().to_string()).collect();
+
+    for task_name in &task_names {
+        // Auto-mark as Done if Running but tmux window is closed
+        if store.auto_mark_done_if_needed(task_name)? {
+            status_changed = true;
+        }
+
+        let status = store.get_status(task_name);
 
         // Only show Running and Done tasks
         if status != TaskStatus::Running && status != TaskStatus::Done {
             continue;
         }
 
-        let instance = store.get_instance(task.name());
+        let instance = store.get_instance(task_name);
 
-        // Check if tmux window is alive (for auto-done detection)
+        // Check if tmux window is alive
         let tmux_alive = instance
             .map(|i| tmux::window_exists(&i.tmux_session, &i.tmux_window))
             .unwrap_or(false);
 
-        // Auto-mark as Done if Running but tmux window gone
-        let final_status = if status == TaskStatus::Running && !tmux_alive {
-            tasks_to_mark_done.push(task.name().to_string());
-            TaskStatus::Done
-        } else {
-            status
-        };
+        let final_status = status;
 
         if final_status == TaskStatus::Running {
             running_count += 1;
@@ -197,7 +199,7 @@ fn display_status(json: bool) -> Result<()> {
             done_count += 1;
         }
 
-        let instance = store.get_instance(task.name());
+        let instance = store.get_instance(task_name);
         let worktree_path = instance.map(|i| i.worktree_path.as_str());
 
         // Get session_id and transcript path info
@@ -262,7 +264,7 @@ fn display_status(json: bool) -> Result<()> {
         };
 
         metrics_list.push(TaskMetrics {
-            name: task.name().to_string(),
+            name: task_name.to_string(),
             status: final_status,
             duration_secs,
             duration_human,
@@ -280,11 +282,8 @@ fn display_status(json: bool) -> Result<()> {
         });
     }
 
-    // Auto-mark tasks as Done
-    if !tasks_to_mark_done.is_empty() {
-        for name in &tasks_to_mark_done {
-            store.set_status(name, TaskStatus::Done);
-        }
+    // Save status if any task was auto-marked as Done
+    if status_changed {
         store.save_status()?;
     }
 
