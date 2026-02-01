@@ -7,6 +7,8 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 use serde_json::Value;
 
+use crate::models::Instance;
+
 /// Metrics extracted from transcript
 #[derive(Debug, Default, Clone)]
 pub struct TranscriptMetrics {
@@ -67,6 +69,17 @@ pub fn transcript_path(worktree_path: &str, session_id: &str) -> Option<PathBuf>
     let projects_dir = claude_projects_dir()?;
     let dir_name = project_dir_name(worktree_path);
     Some(projects_dir.join(dir_name).join(format!("{}.jsonl", session_id)))
+}
+
+/// 查找 Instance 对应的 transcript 文件
+/// 优先使用 session_id 精确匹配，否则查找最新的 transcript
+pub fn find_transcript_for_instance(instance: &Instance) -> Option<PathBuf> {
+    instance
+        .session_id
+        .as_ref()
+        .and_then(|sid| transcript_path(&instance.worktree_path, sid))
+        .filter(|p: &PathBuf| p.exists())
+        .or_else(|| find_latest_transcript(&instance.worktree_path))
 }
 
 /// Find the most recent transcript file for a worktree.

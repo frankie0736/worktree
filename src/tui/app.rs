@@ -101,20 +101,9 @@ impl App {
             };
 
             // Parse transcript for metrics (duration, context, etc.)
-            // Try session_id first, fall back to finding latest transcript
-            let transcript_metrics = instance.and_then(|inst| {
-                // First try with saved session_id
-                let path_from_id = inst
-                    .session_id
-                    .as_ref()
-                    .and_then(|sid| transcript::transcript_path(&inst.worktree_path, sid))
-                    .filter(|p| p.exists());
-
-                // Fall back to finding latest transcript if session_id doesn't match
-                let path = path_from_id.or_else(|| transcript::find_latest_transcript(&inst.worktree_path));
-
-                path.and_then(|p| transcript::parse_transcript(&p))
-            });
+            let transcript_metrics = instance
+                .and_then(transcript::find_transcript_for_instance)
+                .and_then(|p| transcript::parse_transcript(&p));
 
             // Duration from transcript timestamps
             let duration = transcript_metrics

@@ -203,16 +203,8 @@ fn display_status(json: bool) -> Result<()> {
         // Get session_id and transcript path info
         let session_id = instance.and_then(|i| i.session_id.clone());
 
-        // Try session_id first, fall back to finding latest transcript
-        let transcript_path_opt = instance.and_then(|inst| {
-            let path_from_id = inst
-                .session_id
-                .as_ref()
-                .and_then(|sid| transcript::transcript_path(&inst.worktree_path, sid))
-                .filter(|p| p.exists());
-
-            path_from_id.or_else(|| transcript::find_latest_transcript(&inst.worktree_path))
-        });
+        // Find transcript file for this instance
+        let transcript_path_opt = instance.and_then(transcript::find_transcript_for_instance);
         let transcript_exists = transcript_path_opt.as_ref().map(|p| p.exists());
 
         // Parse transcript for metrics

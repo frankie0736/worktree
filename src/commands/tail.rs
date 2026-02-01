@@ -37,13 +37,8 @@ pub fn execute(name: String, count: usize) -> Result<()> {
         return Err(WtError::WorktreeNotFound(name));
     }
 
-    // Find transcript file - try session_id first, fall back to latest
-    let transcript_path = instance
-        .session_id
-        .as_ref()
-        .and_then(|sid| transcript::transcript_path(worktree_path, sid))
-        .filter(|p| p.exists())
-        .or_else(|| transcript::find_latest_transcript(worktree_path))
+    // Find transcript file
+    let transcript_path = transcript::find_transcript_for_instance(instance)
         .ok_or_else(|| WtError::TranscriptNotFound(name.clone()))?;
 
     // Get last N messages
