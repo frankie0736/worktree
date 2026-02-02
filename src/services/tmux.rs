@@ -24,14 +24,17 @@ pub fn create_window(session: &str, window: &str, cwd: &str, command: &str) -> R
     ])?;
 
     // 然后用 send-keys 发送命令，这样 shell 别名也能生效
+    // 使用 -l (literal) 选项确保命令中的空格和特殊字符被正确发送
     let window_target = format!("{}:{}", session, window);
     CommandRunner::tmux().run(&[
         "send-keys",
         "-t",
         &window_target,
+        "-l",
         command,
-        "Enter",
-    ])
+    ])?;
+    // 单独发送 Enter 键
+    CommandRunner::tmux().run(&["send-keys", "-t", &window_target, "Enter"])
 }
 
 pub fn kill_window(session: &str, window: &str) -> Result<()> {

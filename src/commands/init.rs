@@ -32,7 +32,12 @@ fn generate_config(project_name: &str) -> String {
 
 # wt start 执行的参数
 # 支持模板变量: ${{task}}, ${{branch}}, ${{worktree}}
-start_args: --verbose --output-format=stream-json --input-format=stream-json -p "@.wt/tasks/${{task}}.md 请完成这个任务"
+#
+# 交互模式（默认）- 启动 REPL 带初始 prompt
+start_args: '"@.wt/tasks/${{task}}.md 请完成这个任务"'
+#
+# 非交互模式 - 执行完自动退出，适合 CI/自动化
+# start_args: --verbose --output-format=stream-json --input-format=stream-json -p "@.wt/tasks/${{task}}.md 请完成这个任务"
 
 # ============================================
 # 可选配置
