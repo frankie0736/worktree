@@ -77,10 +77,6 @@ pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
 
     tmux::create_window(&config.tmux_session, &name, &worktree_path, &cmd)?;
 
-    if config.init_script.is_some() {
-        println!("  Init script will run in tmux window");
-    }
-
     // Update status.json with scratch=true
     store.set_status(&name, TaskStatus::Running);
     store.set_scratch(&name, true);
@@ -99,9 +95,12 @@ pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
     let relative_path = format!("{}/{}", config.worktree_dir, name);
 
     if print_path {
-        // Only output the path for shell integration (wtn function)
+        // Only output the path for shell integration
         println!("{}", relative_path);
     } else {
+        if config.init_script.is_some() {
+            println!("  Init script will run in tmux window");
+        }
         println!("Created scratch environment '{}'", name);
         println!("  Worktree: {}", relative_path);
         println!("  Branch:   {}", branch);
