@@ -11,6 +11,8 @@ pub fn create_session(session: &str) -> Result<()> {
 
 pub fn create_window(session: &str, window: &str, cwd: &str, command: &str) -> Result<()> {
     let target = format!("{}:", session);
+
+    // 先创建窗口（不带命令），这样会启动交互式 shell
     CommandRunner::tmux().run(&[
         "new-window",
         "-t",
@@ -19,7 +21,16 @@ pub fn create_window(session: &str, window: &str, cwd: &str, command: &str) -> R
         window,
         "-c",
         cwd,
+    ])?;
+
+    // 然后用 send-keys 发送命令，这样 shell 别名也能生效
+    let window_target = format!("{}:{}", session, window);
+    CommandRunner::tmux().run(&[
+        "send-keys",
+        "-t",
+        &window_target,
         command,
+        "Enter",
     ])
 }
 

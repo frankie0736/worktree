@@ -10,6 +10,8 @@ const GITIGNORE_MARKER: &str = "# wt - Worktree Task Manager";
 const GITIGNORE_ENTRIES: &str = r#"# wt - Worktree Task Manager
 # https://github.com/anthropics/wt
 .wt/
+!.wt/tasks/
+!.wt/config.yaml
 "#;
 
 fn get_project_name() -> String {
@@ -253,5 +255,11 @@ mod tests {
     #[test]
     fn test_gitignore_entries_has_wt_dir() {
         assert!(GITIGNORE_ENTRIES.contains(".wt/"));
+    }
+
+    #[test]
+    fn test_gitignore_entries_exposes_tasks_and_config() {
+        assert!(GITIGNORE_ENTRIES.contains("!.wt/tasks/"));
+        assert!(GITIGNORE_ENTRIES.contains("!.wt/config.yaml"));
     }
 }
