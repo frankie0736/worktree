@@ -1,9 +1,7 @@
 use std::env;
 use std::path::Path;
 
-use uuid::Uuid;
-
-use crate::constants::{branch_name, branch_pattern, TASKS_DIR};
+use crate::constants::{BRANCH_PREFIX, TASKS_DIR};
 use crate::error::{Result, WtError};
 use crate::models::{Instance, TaskStatus, TaskStore, WtConfig};
 use crate::services::{git, tmux, workspace::WorkspaceInitializer};
@@ -36,15 +34,13 @@ pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
         )));
     }
 
-    // 3. Check if branch pattern exists
-    let branches = git::find_branches(&branch_pattern(&name));
-    if !branches.is_empty() {
-        return Err(WtError::BranchExists(branches[0].clone()));
+    // 3. Check if branch exists (simple name for scratch)
+    let branch = format!("{}{}", BRANCH_PREFIX, name);
+    if git::branch_exists(&branch) {
+        return Err(WtError::BranchExists(branch));
     }
 
     // Create resources (similar to start.rs but without claude command)
-    let session_id = Uuid::new_v4().to_string();
-    let branch = branch_name(&name, &session_id);
     let cwd = env::current_dir().map_err(|e| WtError::Git(e.to_string()))?;
     let worktree_path = cwd
         .join(&config.worktree_dir)
@@ -115,12 +111,10 @@ fn generate_scratch_name(store: &TaskStore) -> String {
     let mut n = 1;
     loop {
         let name = format!("s{}", n);
+        let branch = format!("{}{}", BRANCH_PREFIX, name);
         // Check if name exists in status.json or as a branch
-        if !store.name_exists_in_status(&name) {
-            let branches = git::find_branches(&branch_pattern(&name));
-            if branches.is_empty() {
-                return name;
-            }
+        if !store.name_exists_in_status(&name) && !git::branch_exists(&branch) {
+            return name;
         }
         n += 1;
     }
