@@ -57,8 +57,13 @@ pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
     // Copy files from main project to worktree
     let copied = initializer.copy_files(&config.copy_files)?;
     for file in &copied {
-        println!("  Copied: {}", file);
+        if !print_path {
+            println!("  Copied: {}", file);
+        }
     }
+
+    // Create symlink for status.json so wt commands work from worktree
+    initializer.link_status_file()?;
 
     // Create tmux session if needed
     if !tmux::session_exists(&config.tmux_session) {

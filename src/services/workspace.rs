@@ -50,6 +50,34 @@ impl<'a> WorkspaceInitializer<'a> {
         Ok(copied)
     }
 
+    /// Create symlink for status.json so wt commands work from worktree.
+    pub fn link_status_file(&self) -> Result<()> {
+        use std::os::unix::fs::symlink;
+
+        let wt_dir = PathBuf::from(self.worktree_path).join(".wt");
+        let link_path = wt_dir.join("status.json");
+        let target = self.source_dir.join(".wt/status.json");
+
+        // Ensure .wt directory exists in worktree
+        std::fs::create_dir_all(&wt_dir).map_err(|e| WtError::Io {
+            operation: "create .wt directory".to_string(),
+            path: wt_dir.to_string_lossy().to_string(),
+            message: e.to_string(),
+        })?;
+
+        // Remove existing file/link if present
+        let _ = std::fs::remove_file(&link_path);
+
+        // Create symlink
+        symlink(&target, &link_path).map_err(|e| WtError::Io {
+            operation: "create symlink".to_string(),
+            path: link_path.to_string_lossy().to_string(),
+            message: e.to_string(),
+        })?;
+
+        Ok(())
+    }
+
     /// Run an initialization script in the worktree directory.
     pub fn run_init_script(&self, script: &str) -> Result<()> {
         let status = Command::new("bash")
