@@ -27,7 +27,7 @@ fn main() {
         Commands::Status { json, action, task } => commands::status::execute(json, action, task),
         Commands::Tail { name, count } => commands::tail::execute(name, count),
         Commands::Logs => commands::logs::execute(),
-        Commands::New { name } => commands::new::execute(name),
+        Commands::New { name, print_path } => commands::new::execute(name, print_path),
         Commands::Completions { action } => match action {
             CompletionsAction::Generate { shell } => commands::completions::generate_completions(shell),
             CompletionsAction::Install => commands::completions::install(),

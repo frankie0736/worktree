@@ -110,8 +110,12 @@ pub enum Commands {
 
     /// Create a scratch environment (quick worktree without task file)
     New {
-        /// Optional name (defaults to new-YYYYMMDD-HHMMSS)
+        /// Optional name (defaults to s1, s2, ...)
         name: Option<String>,
+
+        /// Only print the worktree path (for shell integration)
+        #[arg(long)]
+        print_path: bool,
     },
 
     /// Generate or install shell completions

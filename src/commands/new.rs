@@ -1,7 +1,6 @@
 use std::env;
 use std::path::Path;
 
-use chrono::Local;
 use uuid::Uuid;
 
 use crate::constants::{branch_name, branch_pattern, TASKS_DIR};
@@ -9,7 +8,7 @@ use crate::error::{Result, WtError};
 use crate::models::{Instance, TaskStatus, TaskStore, WtConfig};
 use crate::services::{git, tmux, workspace::WorkspaceInitializer};
 
-pub fn execute(name: Option<String>) -> Result<()> {
+pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
     let config = WtConfig::load()?;
     let mut store = TaskStore::load()?;
 
@@ -19,7 +18,7 @@ pub fn execute(name: Option<String>) -> Result<()> {
             TaskStore::validate_task_name(&n)?;
             n
         }
-        None => generate_scratch_name(),
+        None => generate_scratch_name(&store),
     };
 
     // Conflict checks
@@ -99,15 +98,31 @@ pub fn execute(name: Option<String>) -> Result<()> {
 
     let relative_path = format!("{}/{}", config.worktree_dir, name);
 
-    println!("Created scratch environment '{}'", name);
-    println!("  Worktree: {}", relative_path);
-    println!("  Branch:   {}", branch);
-    println!("  Tmux:     {}:{}", config.tmux_session, name);
+    if print_path {
+        // Only output the path for shell integration (wtn function)
+        println!("{}", relative_path);
+    } else {
+        println!("Created scratch environment '{}'", name);
+        println!("  Worktree: {}", relative_path);
+        println!("  Branch:   {}", branch);
+        println!("  Tmux:     {}:{}", config.tmux_session, name);
+    }
 
     Ok(())
 }
 
-fn generate_scratch_name() -> String {
-    let now = Local::now();
-    format!("new-{}", now.format("%Y%m%d-%H%M%S"))
+/// Generate next available scratch name: s1, s2, s3...
+fn generate_scratch_name(store: &TaskStore) -> String {
+    let mut n = 1;
+    loop {
+        let name = format!("s{}", n);
+        // Check if name exists in status.json or as a branch
+        if !store.name_exists_in_status(&name) {
+            let branches = git::find_branches(&branch_pattern(&name));
+            if branches.is_empty() {
+                return name;
+            }
+        }
+        n += 1;
+    }
 }

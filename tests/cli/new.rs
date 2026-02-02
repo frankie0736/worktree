@@ -7,7 +7,7 @@ use crate::common::*;
 // ==================== Name Generation ====================
 
 #[test]
-fn test_new_auto_generates_name_with_timestamp() {
+fn test_new_auto_generates_name_s1_s2() {
     let dir = setup_test_repo();
 
     // wt new without name should fail in test environment (no tmux)
@@ -18,11 +18,11 @@ fn test_new_auto_generates_name_with_timestamp() {
     // or succeed in creating status entry before tmux failure
     let output = format!("{}{}", stdout, stderr);
 
-    // The command should attempt to create a scratch env with auto-generated name
+    // The command should attempt to create a scratch env with auto-generated name (s1, s2, ...)
     // Either succeeds partially or fails on tmux - both indicate name was generated
     assert!(
-        output.contains("new-") || output.contains("Created scratch") || output.contains("tmux"),
-        "Expected auto-generated name pattern 'new-' or creation message, got: {}",
+        output.contains(": s1") || output.contains(": s2") || output.contains("'s1'") || output.contains("'s2'") || output.contains("Created scratch"),
+        "Expected auto-generated name pattern 's1/s2' or creation message, got: {}",
         output
     );
 }

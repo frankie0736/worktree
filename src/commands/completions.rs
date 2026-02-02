@@ -22,9 +22,9 @@ pub fn install() -> Result<()> {
     let rc_file = get_rc_file(&shell)?;
     let eval_line = get_eval_line(&shell);
 
-    // Check if already installed
+    // Check if already installed (by marker comment)
     let rc_content = fs::read_to_string(&rc_file).unwrap_or_default();
-    if rc_content.contains(&eval_line) {
+    if rc_content.contains("# wt shell completions") {
         println!("Completions already installed in {}", rc_file.display());
         return Ok(());
     }
@@ -78,9 +78,9 @@ pub fn is_installed() -> bool {
         Ok(f) => f,
         Err(_) => return false,
     };
-    let eval_line = get_eval_line(&shell);
     let rc_content = fs::read_to_string(&rc_file).unwrap_or_default();
-    rc_content.contains(&eval_line)
+    // Check for the marker comment
+    rc_content.contains("# wt shell completions")
 }
 
 fn detect_shell() -> Result<Shell> {
@@ -126,9 +126,12 @@ fn get_rc_file(shell: &Shell) -> Result<PathBuf> {
 
 fn get_eval_line(shell: &Shell) -> String {
     match shell {
-        Shell::Zsh => r#"eval "$(wt completions generate zsh)""#.to_string(),
-        Shell::Bash => r#"eval "$(wt completions generate bash)""#.to_string(),
-        Shell::Fish => "wt completions generate fish | source".to_string(),
+        Shell::Zsh => r#"eval "$(wt completions generate zsh)"
+wtn() { local p; p=$(wt new "$@" --print-path) && cd "$p"; }"#.to_string(),
+        Shell::Bash => r#"eval "$(wt completions generate bash)"
+wtn() { local p; p=$(wt new "$@" --print-path) && cd "$p"; }"#.to_string(),
+        Shell::Fish => r#"wt completions generate fish | source
+function wtn; set -l p (wt new $argv --print-path); and cd $p; end"#.to_string(),
         _ => String::new(),
     }
 }
