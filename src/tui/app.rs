@@ -257,7 +257,7 @@ impl App {
         if let Some(task) = self.selected_task() {
             if task.status == TaskStatus::Done {
                 let name = task.name.clone();
-                crate::commands::merged::execute(name)?;
+                crate::commands::merged::execute(name, true)?; // silent=true for TUI
                 self.refresh()?;
             }
         }
@@ -276,7 +276,7 @@ impl App {
         if let Some(task) = self.selected_task() {
             if task.status == TaskStatus::Merged {
                 let name = task.name.clone();
-                crate::commands::archive::execute(name)?;
+                crate::commands::archive::execute(name, true)?; // silent=true for TUI
                 self.refresh()?;
             }
         }

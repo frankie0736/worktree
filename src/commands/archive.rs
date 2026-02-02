@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore, WtConfig};
 use crate::services::{git, tmux, workspace::WorkspaceInitializer};
 
-pub fn execute(name: String) -> Result<()> {
+pub fn execute(name: String, silent: bool) -> Result<()> {
     let config = WtConfig::load()?;
     let mut store = TaskStore::load()?;
 
@@ -15,7 +15,9 @@ pub fn execute(name: String) -> Result<()> {
     // Run archive script if configured
     if let Some(ref script) = config.archive_script {
         if let Some(instance) = store.get_instance(&name) {
-            println!("Running archive script...");
+            if !silent {
+                println!("Running archive script...");
+            }
             let source_dir = Path::new(".");
             let initializer = WorkspaceInitializer::new(&instance.worktree_path, source_dir);
             initializer.run_init_script(script)?;
@@ -24,22 +26,28 @@ pub fn execute(name: String) -> Result<()> {
 
     // Cleanup all resources
     if let Some(instance) = store.get_instance(&name) {
-        println!("Archiving resources...");
+        if !silent {
+            println!("Archiving resources...");
+        }
 
         // Kill tmux window (may already be gone from merged)
         let _ = tmux::kill_window(&instance.tmux_session, &instance.tmux_window);
 
         // Remove worktree
         if let Err(e) = git::remove_worktree(&instance.worktree_path) {
-            eprintln!("  Warning: Failed to remove worktree: {}", e);
-        } else {
+            if !silent {
+                eprintln!("  Warning: Failed to remove worktree: {}", e);
+            }
+        } else if !silent {
             println!("  Removed worktree: {}", instance.worktree_path);
         }
 
         // Delete branch
         if let Err(e) = git::delete_branch(&instance.branch) {
-            eprintln!("  Warning: Failed to delete branch: {}", e);
-        } else {
+            if !silent {
+                eprintln!("  Warning: Failed to delete branch: {}", e);
+            }
+        } else if !silent {
             println!("  Deleted branch: {}", instance.branch);
         }
     }
@@ -49,6 +57,8 @@ pub fn execute(name: String) -> Result<()> {
     store.set_instance(&name, None);
     store.save_status()?;
 
-    println!("Task '{}' archived.", name);
+    if !silent {
+        println!("Task '{}' archived.", name);
+    }
     Ok(())
 }
