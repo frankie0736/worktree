@@ -1,9 +1,17 @@
-use crate::error::Result;
+use crate::error::{Result, WtError};
 use crate::models::{TaskStatus, TaskStore};
 use crate::services::tmux;
 
 pub fn execute(name: String, silent: bool) -> Result<()> {
     let mut store = TaskStore::load()?;
+
+    // Check if scratch environment
+    if store.is_scratch(&name) {
+        return Err(WtError::InvalidInput(format!(
+            "Scratch environment '{}' cannot be marked as merged. Use 'wt archive {}' to clean up.",
+            name, name
+        )));
+    }
 
     // Check task exists
     store.ensure_exists(&name)?;

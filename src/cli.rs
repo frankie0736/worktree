@@ -106,4 +106,10 @@ pub enum Commands {
 
     /// Generate filtered logs for all tasks
     Logs,
+
+    /// Create a scratch environment (quick worktree without task file)
+    New {
+        /// Optional name (defaults to new-YYYYMMDD-HHMMSS)
+        name: Option<String>,
+    },
 }

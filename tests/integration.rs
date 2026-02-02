@@ -8,3 +8,5 @@ mod cycle_detection;
 mod error_messages;
 #[path = "integration/json_output.rs"]
 mod json_output;
+#[path = "integration/edge_cases.rs"]
+mod edge_cases;

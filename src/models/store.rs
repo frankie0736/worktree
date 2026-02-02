@@ -142,6 +142,29 @@ impl TaskStore {
         self.status.set_instance(name, instance);
     }
 
+    /// Check if a task is a scratch environment
+    pub fn is_scratch(&self, name: &str) -> bool {
+        self.status
+            .tasks
+            .get(name)
+            .and_then(|s| s.scratch)
+            .unwrap_or(false)
+    }
+
+    /// Set scratch flag for a task
+    pub fn set_scratch(&mut self, name: &str, scratch: bool) {
+        self.status
+            .tasks
+            .entry(name.to_string())
+            .or_default()
+            .scratch = Some(scratch);
+    }
+
+    /// Check if a name exists in status.json (for scratch name collision)
+    pub fn name_exists_in_status(&self, name: &str) -> bool {
+        self.status.tasks.contains_key(name)
+    }
+
     /// Save status to .wt/status.json
     pub fn save_status(&self) -> Result<()> {
         self.status.save()
@@ -667,6 +690,31 @@ mod tests {
         store.set_instance("test", Some(instance));
         assert!(store.get_instance("test").is_some());
         assert_eq!(store.get_instance("test").unwrap().branch, "wt/test");
+    }
+
+    #[test]
+    fn test_store_is_scratch_default() {
+        let store = TaskStore::default();
+        assert!(!store.is_scratch("nonexistent"));
+    }
+
+    #[test]
+    fn test_store_set_and_get_scratch() {
+        let mut store = TaskStore::default();
+        store.set_scratch("test", true);
+        assert!(store.is_scratch("test"));
+
+        store.set_scratch("test", false);
+        assert!(!store.is_scratch("test"));
+    }
+
+    #[test]
+    fn test_store_name_exists_in_status() {
+        let mut store = TaskStore::default();
+        assert!(!store.name_exists_in_status("test"));
+
+        store.set_status("test", TaskStatus::Running);
+        assert!(store.name_exists_in_status("test"));
     }
 
     // ==================== ensure_exists Tests ====================

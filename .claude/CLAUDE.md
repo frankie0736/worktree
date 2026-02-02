@@ -32,6 +32,7 @@ src/
 │   ├── merged.rs
 │   ├── archive.rs
 │   ├── reset.rs
+│   ├── new.rs        # scratch 环境创建
 │   ├── status/       # 状态命令（已模块化）
 │   │   ├── mod.rs    # 入口
 │   │   ├── types.rs  # 数据结构

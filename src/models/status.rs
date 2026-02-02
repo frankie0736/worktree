@@ -14,6 +14,8 @@ pub struct TaskState {
     pub status: TaskStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub instance: Option<Instance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scratch: Option<bool>,
 }
 
 impl Default for TaskState {
@@ -21,6 +23,7 @@ impl Default for TaskState {
         Self {
             status: TaskStatus::Pending,
             instance: None,
+            scratch: None,
         }
     }
 }
@@ -126,6 +129,39 @@ mod tests {
         let state = TaskState::default();
         assert_eq!(state.status, TaskStatus::Pending);
         assert!(state.instance.is_none());
+        assert!(state.scratch.is_none());
+    }
+
+    #[test]
+    fn test_task_state_with_scratch() {
+        let json = r#"{"status":"running","scratch":true}"#;
+        let state: TaskState = serde_json::from_str(json).unwrap();
+        assert_eq!(state.status, TaskStatus::Running);
+        assert_eq!(state.scratch, Some(true));
+    }
+
+    #[test]
+    fn test_task_state_scratch_serialization() {
+        let mut state = TaskState::default();
+        state.status = TaskStatus::Running;
+        state.scratch = Some(true);
+
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(json.contains("\"scratch\":true"));
+
+        // Without scratch, field should be omitted
+        state.scratch = None;
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(!json.contains("scratch"));
+    }
+
+    #[test]
+    fn test_task_state_backward_compatible() {
+        // Old JSON without scratch field should still deserialize
+        let json = r#"{"status":"running"}"#;
+        let state: TaskState = serde_json::from_str(json).unwrap();
+        assert_eq!(state.status, TaskStatus::Running);
+        assert!(state.scratch.is_none());
     }
 
     #[test]

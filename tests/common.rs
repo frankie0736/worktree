@@ -143,3 +143,123 @@ pub fn set_task_status_with_instance(
 
     fs::write(&status_file, serde_json::to_string_pretty(&status_data).unwrap()).unwrap();
 }
+
+/// Set scratch status for a task (scratch=true in status.json)
+pub fn set_scratch_status(dir: &Path, name: &str, status: &str) {
+    let status_file = dir.join(".wt/status.json");
+    let wt_dir = dir.join(".wt");
+    fs::create_dir_all(&wt_dir).unwrap();
+
+    // Load existing status or create new
+    let mut status_data: HashMap<String, serde_json::Value> = if status_file.exists() {
+        let content = fs::read_to_string(&status_file).unwrap();
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    // Get or create tasks map
+    let tasks = status_data
+        .entry("tasks".to_string())
+        .or_insert_with(|| serde_json::json!({}));
+
+    // Set task status with scratch=true
+    if let Some(tasks_obj) = tasks.as_object_mut() {
+        let task_data = serde_json::json!({
+            "status": status,
+            "scratch": true
+        });
+        tasks_obj.insert(name.to_string(), task_data);
+    }
+
+    fs::write(&status_file, serde_json::to_string_pretty(&status_data).unwrap()).unwrap();
+}
+
+/// Set scratch status with instance info
+pub fn set_scratch_status_with_instance(
+    dir: &Path,
+    name: &str,
+    status: &str,
+    instance: serde_json::Value,
+) {
+    let status_file = dir.join(".wt/status.json");
+    let wt_dir = dir.join(".wt");
+    fs::create_dir_all(&wt_dir).unwrap();
+
+    let mut status_data: HashMap<String, serde_json::Value> = if status_file.exists() {
+        let content = fs::read_to_string(&status_file).unwrap();
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    let tasks = status_data
+        .entry("tasks".to_string())
+        .or_insert_with(|| serde_json::json!({}));
+
+    if let Some(tasks_obj) = tasks.as_object_mut() {
+        let task_data = serde_json::json!({
+            "status": status,
+            "scratch": true,
+            "instance": instance
+        });
+        tasks_obj.insert(name.to_string(), task_data);
+    }
+
+    fs::write(&status_file, serde_json::to_string_pretty(&status_data).unwrap()).unwrap();
+}
+
+/// Parse status.json and return the Value
+pub fn parse_status_json(dir: &Path) -> serde_json::Value {
+    let status_file = dir.join(".wt/status.json");
+    if status_file.exists() {
+        let content = fs::read_to_string(&status_file).unwrap();
+        serde_json::from_str(&content).unwrap_or_default()
+    } else {
+        serde_json::json!({ "tasks": {} })
+    }
+}
+
+/// Get a specific task from status.json
+pub fn get_task_from_status(dir: &Path, name: &str) -> Option<serde_json::Value> {
+    let status = parse_status_json(dir);
+    status
+        .get("tasks")
+        .and_then(|t| t.get(name))
+        .cloned()
+}
+
+/// Check if task exists in status.json
+pub fn task_exists_in_status(dir: &Path, name: &str) -> bool {
+    get_task_from_status(dir, name).is_some()
+}
+
+/// Assert wt command succeeds with expected stdout content
+pub fn assert_wt_success(dir: &Path, args: &[&str], expected_stdout: &str) {
+    let (ok, stdout, stderr) = run_wt(dir, args);
+    assert!(
+        ok,
+        "Expected success but got failure.\nstdout: {}\nstderr: {}",
+        stdout, stderr
+    );
+    assert!(
+        stdout.contains(expected_stdout),
+        "Expected stdout to contain '{}' but got:\n{}",
+        expected_stdout, stdout
+    );
+}
+
+/// Assert wt command fails with expected stderr content
+pub fn assert_wt_error(dir: &Path, args: &[&str], expected_stderr: &str) {
+    let (ok, stdout, stderr) = run_wt(dir, args);
+    assert!(
+        !ok,
+        "Expected failure but got success.\nstdout: {}\nstderr: {}",
+        stdout, stderr
+    );
+    assert!(
+        stderr.contains(expected_stderr),
+        "Expected stderr to contain '{}' but got:\n{}",
+        expected_stderr, stderr
+    );
+}

@@ -32,3 +32,13 @@ mod no_config;
 mod reset;
 #[path = "cli/status.rs"]
 mod status;
+#[path = "cli/new.rs"]
+mod new;
+#[path = "cli/archive.rs"]
+mod archive;
+#[path = "cli/scratch.rs"]
+mod scratch;
+#[path = "cli/tail.rs"]
+mod tail;
+#[path = "cli/logs.rs"]
+mod logs;

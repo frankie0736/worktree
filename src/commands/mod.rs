@@ -5,6 +5,7 @@ pub mod init;
 pub mod list;
 pub mod logs;
 pub mod merged;
+pub mod new;
 pub mod next;
 pub mod reset;
 pub mod start;

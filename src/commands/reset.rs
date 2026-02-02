@@ -13,13 +13,18 @@ pub fn execute(name: String) -> Result<()> {
     let config = WtConfig::load()?;
     let mut store = TaskStore::load()?;
 
-    // Check task exists
-    store.ensure_exists(&name)?;
+    let is_scratch = store.is_scratch(&name);
+
+    // For normal tasks, check task file exists
+    if !is_scratch {
+        store.ensure_exists(&name)?;
+    }
 
     let current_status = store.get_status(&name);
 
-    // Check for non-pending dependents (exclude Archived and Pending from blocking)
-    if current_status != TaskStatus::Pending {
+    // For scratch, skip dependent check (no other tasks depend on scratch)
+    // For normal tasks, check for non-pending dependents
+    if !is_scratch && current_status != TaskStatus::Pending {
         let dependents: Vec<_> = dependency::find_non_pending_dependents(&store, &name)
             .into_iter()
             .filter(|(_, status)| *status != TaskStatus::Archived)
@@ -37,7 +42,7 @@ pub fn execute(name: String) -> Result<()> {
     if let Some(instance) = store.get_instance(&name).cloned() {
         let worktree_path = Path::new(&instance.worktree_path);
 
-        // Run archive_script to slim down before backup
+        // Run archive_script to slim down before backup (skip for scratch)
         if worktree_path.exists() {
             if let Some(ref script) = config.archive_script {
                 println!("Running archive script...");
@@ -48,8 +53,10 @@ pub fn execute(name: String) -> Result<()> {
                 }
             }
 
-            // Backup worktree
-            backup_worktree(&name, &instance.worktree_path)?;
+            // Skip backup for scratch environments
+            if !is_scratch {
+                backup_worktree(&name, &instance.worktree_path)?;
+            }
         }
 
         println!("Cleaning up resources...");
@@ -86,12 +93,19 @@ pub fn execute(name: String) -> Result<()> {
         }
     }
 
-    // Update status to Pending and clear instance
-    store.set_status(&name, TaskStatus::Pending);
-    store.set_instance(&name, None);
-    store.save_status()?;
-
-    println!("Task '{}' reset to pending.", name);
+    // Update status
+    if is_scratch {
+        // Scratch: remove entry from status.json entirely
+        store.status.tasks.remove(&name);
+        store.save_status()?;
+        println!("Scratch environment '{}' cleaned up.", name);
+    } else {
+        // Normal task: reset to Pending and clear instance
+        store.set_status(&name, TaskStatus::Pending);
+        store.set_instance(&name, None);
+        store.save_status()?;
+        println!("Task '{}' reset to pending.", name);
+    }
     Ok(())
 }
 

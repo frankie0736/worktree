@@ -27,6 +27,7 @@ fn main() {
         Commands::Status { json, action, task } => commands::status::execute(json, action, task),
         Commands::Tail { name, count } => commands::tail::execute(name, count),
         Commands::Logs => commands::logs::execute(),
+        Commands::New { name } => commands::new::execute(name),
     };
 
     if let Err(e) = result {
