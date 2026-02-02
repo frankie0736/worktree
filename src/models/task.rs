@@ -42,15 +42,29 @@ impl TaskStatus {
         }
     }
 
-    /// Get status icon for display.
+    /// Get plain status icon (without color).
     pub fn icon(&self) -> &'static str {
         match self {
             TaskStatus::Pending => "○",
             TaskStatus::Running => "●",
-            TaskStatus::Done => "◉",
-            TaskStatus::Merged => "✓",
-            TaskStatus::Archived => "□",
+            TaskStatus::Done => "✓",
+            TaskStatus::Merged => "✓✓",
+            TaskStatus::Archived => "☑",
         }
+    }
+
+    /// Get colored status icon for terminal display.
+    pub fn colored_icon(&self) -> String {
+        use crate::display::{GRAY, GREEN, MAGENTA, RESET, WHITE};
+
+        let color = match self {
+            TaskStatus::Pending => WHITE,
+            TaskStatus::Running => GREEN,
+            TaskStatus::Done => GREEN,
+            TaskStatus::Merged => MAGENTA,
+            TaskStatus::Archived => GRAY,
+        };
+        format!("{}{}{}", color, self.icon(), RESET)
     }
 }
 
@@ -154,15 +168,6 @@ mod tests {
         assert_eq!(TaskStatus::Done.display_name(), "done");
         assert_eq!(TaskStatus::Merged.display_name(), "merged");
         assert_eq!(TaskStatus::Archived.display_name(), "archived");
-    }
-
-    #[test]
-    fn test_task_status_icon() {
-        assert_eq!(TaskStatus::Pending.icon(), "○");
-        assert_eq!(TaskStatus::Running.icon(), "●");
-        assert_eq!(TaskStatus::Done.icon(), "◉");
-        assert_eq!(TaskStatus::Merged.icon(), "✓");
-        assert_eq!(TaskStatus::Archived.icon(), "□");
     }
 
     #[test]

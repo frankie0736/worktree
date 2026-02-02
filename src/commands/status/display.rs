@@ -1,7 +1,8 @@
+use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::constants::IDLE_THRESHOLD_SECS;
-use crate::display::format_duration;
+use crate::display::{colored_index, format_duration, running_icon, RESET};
 use crate::error::Result;
 use crate::models::{TaskStatus, TaskStore};
 use crate::services::{git, tmux, transcript};
@@ -21,6 +22,13 @@ pub fn display_status(json: bool) -> Result<()> {
 
     // Collect task names first to avoid borrow conflict
     let task_names: Vec<String> = store.list().iter().map(|t| t.name().to_string()).collect();
+
+    // Build name -> index mapping (1-based)
+    let index_map: HashMap<String, usize> = task_names
+        .iter()
+        .enumerate()
+        .map(|(i, name)| (name.clone(), i + 1))
+        .collect();
 
     for task_name in &task_names {
         // Auto-mark as Done if Running but tmux window is closed
@@ -108,6 +116,7 @@ pub fn display_status(json: bool) -> Result<()> {
         };
 
         metrics_list.push(TaskMetrics {
+            index: index_map[task_name],
             name: task_name.to_string(),
             status: final_status,
             duration_secs,
@@ -157,22 +166,30 @@ fn print_human_readable(output: &StatusOutput) {
     println!();
 
     for task in &output.tasks {
-        // tmux_alive takes precedence: if window is dead, show warning
-        let status_indicator = match task.tmux_alive {
-            Some(false) => " ⚠️  (tmux window closed)",
-            _ => match task.active {
-                Some(true) => " 🟢",
-                Some(false) => " 💤",
-                None => "",
-            },
+        // For Running status, use running_icon for consistent display with TUI
+        let (icon_str, status_suffix) = if task.status == TaskStatus::Running {
+            let (icon, color) = running_icon(task.tmux_alive, task.active);
+            let colored = format!("{}{}{}", color, icon, RESET);
+            let suffix = match task.tmux_alive {
+                Some(false) => " (tmux closed)",
+                _ => match task.active {
+                    Some(true) => "",
+                    Some(false) => " (idle)",
+                    None => "",
+                },
+            };
+            (colored, suffix)
+        } else {
+            (task.status.colored_icon(), "")
         };
 
         println!(
-            "{} {} ({}){}",
-            task.status.icon(),
+            "{} {} {} ({}){}",
+            colored_index(task.index),
+            icon_str,
             task.name,
             task.status.display_name(),
-            status_indicator
+            status_suffix
         );
 
         if let Some(ref duration) = task.duration_human {
