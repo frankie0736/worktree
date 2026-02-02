@@ -33,20 +33,25 @@ wt reset auth                              # 重置（会备份代码）
 
 | 命令 | 说明 |
 |------|------|
-| `wt init` | 初始化配置 |
+| `wt init` | 初始化配置（自动安装 shell 补全） |
 | `wt create --json '{...}'` | 创建任务 |
 | `wt validate [name]` | 验证任务 |
-| `wt list [--tree] [--json]` | 列出任务 |
+| `wt list [--tree] [--json]` | 列出任务（显示索引） |
 | `wt next [--json]` | 显示可启动任务 |
-| `wt start <name>` | 启动任务 |
+| `wt start <name\|index>` | 启动任务（支持名称或索引） |
 | `wt start --all` | 启动所有就绪任务 |
 | `wt status [--json] [--action X --task Y]` | 查看状态 (默认 TUI) |
-| `wt tail <name> [-n N]` | 查看最后 N 条输出 (JSON) |
+| `wt tail <name\|index> [-n N]` | 查看最后 N 条输出 (JSON) |
 | `wt logs` | 生成所有任务的过滤日志 |
-| `wt done <name>` | 标记完成 |
-| `wt merged <name>` | 标记已合并（保留 worktree）|
-| `wt archive <name>` | 归档（清理 worktree/分支）|
-| `wt reset <name>` | 重置到 pending（备份代码）|
+| `wt done <name\|index>` | 标记完成 |
+| `wt merged <name\|index>` | 标记已合并（保留 worktree）|
+| `wt archive <name\|index>` | 归档（清理 worktree/分支）|
+| `wt reset <name\|index>` | 重置到 pending（备份代码）|
+| `wt new [name]` | 创建 scratch 环境 |
+| `wt completions generate <shell>` | 生成 shell 补全脚本 |
+| `wt completions install` | 安装 shell 补全到配置文件 |
+
+> **提示**：所有接受任务名的命令都支持使用索引，如 `wt start 1` 等同于 `wt start auth`（假设 auth 是第 1 个任务）
 
 ## Status TUI 快捷键
 
@@ -108,7 +113,7 @@ tmux_session: my-project
 ## 任务状态
 
 ```
-○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged  →  □ Archived
+○ Pending  →  ● Running  →  ✓ Done  →  ✓✓ Merged  →  ☑ Archived
 ```
 
 - **reset** 可从 Running/Done/Merged/Archived 回到 Pending（会备份代码到 `.wt/backups/`）

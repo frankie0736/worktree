@@ -14,7 +14,7 @@ src/
 ├── lib.rs            # 库导出
 ├── cli.rs            # Clap 命令定义
 ├── constants.rs      # 路径常量 (TASKS_DIR, STATUS_FILE 等)
-├── display.rs        # 显示格式化 (format_duration 等)
+├── display.rs        # 显示格式化 (颜色常量, colored_index, running_icon, format_duration)
 ├── error.rs          # 错误类型 (WtError)
 ├── models/
 │   ├── task.rs       # Task, TaskStatus, TaskInput, Instance
@@ -39,7 +39,8 @@ src/
 │   │   ├── display.rs # 显示逻辑
 │   │   └── actions.rs # Action API
 │   ├── tail.rs
-│   └── logs.rs
+│   ├── logs.rs
+│   └── completions.rs # shell 补全生成/安装
 ├── services/
 │   ├── command.rs    # 命令执行辅助 (CommandRunner)
 │   ├── git.rs        # git worktree 操作
@@ -108,11 +109,17 @@ depends:            # 依赖的任务列表
 ### TaskStatus 状态流转
 
 ```
-○ Pending  →  ● Running  →  ◉ Done  →  ✓ Merged  →  □ Archived
+○ Pending  →  ● Running  →  ✓ Done  →  ✓✓ Merged  →  ☑ Archived
    (wt start)    (wt done)    (wt merged)   (wt archive)
       ↑______________|__________|____________|
                     (wt reset，会备份)
 ```
+
+### 任务索引
+
+所有命令支持用 1-based 索引代替任务名：
+- `wt start 1` 等同于 `wt start <第一个任务>`
+- 优先级：任务名 > 索引号（若任务名为 "1"，则匹配任务名）
 
 ### 依赖规则
 
