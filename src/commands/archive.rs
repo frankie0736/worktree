@@ -28,60 +28,63 @@ pub fn execute(task_ref: String, silent: bool) -> Result<()> {
         store.validate_transition(&name, TaskStatus::Archived)?;
     }
 
-    // Run archive script if configured
+    // Get instance info and repo root before modifying anything
+    let instance = store.get_instance(&name).cloned();
+    let repo_root = git::get_repo_root()?;
+
+    // Run archive script if configured (before any cleanup)
     if let Some(ref script) = config.archive_script {
-        if let Some(instance) = store.get_instance(&name) {
+        if let Some(ref inst) = instance {
             if !silent {
                 println!("Running archive script...");
             }
             let source_dir = Path::new(".");
-            let initializer = WorkspaceInitializer::new(&instance.worktree_path, source_dir);
+            let initializer = WorkspaceInitializer::new(&inst.worktree_path, source_dir);
             initializer.run_init_script(script)?;
         }
     }
 
-    // Cleanup all resources
-    if let Some(instance) = store.get_instance(&name) {
+    // Update status BEFORE deleting worktree (symlink would be deleted with worktree)
+    if is_scratch {
+        store.status.tasks.remove(&name);
+    } else {
+        store.set_status(&name, TaskStatus::Archived);
+        store.set_instance(&name, None);
+    }
+    store.save_status()?;
+
+    // Cleanup all resources (after status is saved)
+    if let Some(inst) = instance {
         if !silent {
             println!("Archiving resources...");
         }
 
         // Kill tmux window (may already be gone from merged)
-        let _ = tmux::kill_window(&instance.tmux_session, &instance.tmux_window);
+        let _ = tmux::kill_window(&inst.tmux_session, &inst.tmux_window);
 
         // Remove worktree
-        if let Err(e) = git::remove_worktree(&instance.worktree_path) {
+        if let Err(e) = git::remove_worktree(&inst.worktree_path) {
             if !silent {
                 eprintln!("  Warning: Failed to remove worktree: {}", e);
             }
         } else if !silent {
-            println!("  Removed worktree: {}", instance.worktree_path);
+            println!("  Removed worktree: {}", inst.worktree_path);
         }
 
-        // Delete branch
-        if let Err(e) = git::delete_branch(&instance.branch) {
+        // Delete branch (run from repo root since worktree is gone)
+        if let Err(e) = git::delete_branch_in(&inst.branch, &repo_root) {
             if !silent {
                 eprintln!("  Warning: Failed to delete branch: {}", e);
             }
         } else if !silent {
-            println!("  Deleted branch: {}", instance.branch);
+            println!("  Deleted branch: {}", inst.branch);
         }
     }
 
-    // Update status
-    if is_scratch {
-        // Scratch: remove entry from status.json entirely
-        store.status.tasks.remove(&name);
-        store.save_status()?;
-        if !silent {
+    if !silent {
+        if is_scratch {
             println!("Scratch environment '{}' cleaned up.", name);
-        }
-    } else {
-        // Normal task: set to Archived and clear instance
-        store.set_status(&name, TaskStatus::Archived);
-        store.set_instance(&name, None);
-        store.save_status()?;
-        if !silent {
+        } else {
             println!("Task '{}' archived.", name);
         }
     }

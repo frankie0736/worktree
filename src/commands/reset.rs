@@ -41,6 +41,9 @@ pub fn execute(task_ref: String) -> Result<()> {
         }
     }
 
+    // Get repo root before cleanup (needed for git commands after worktree removal)
+    let repo_root = git::get_repo_root()?;
+
     // Backup and cleanup resources if instance exists
     if let Some(instance) = store.get_instance(&name).cloned() {
         let worktree_path = Path::new(&instance.worktree_path);
@@ -78,8 +81,8 @@ pub fn execute(task_ref: String) -> Result<()> {
             println!("  Removed worktree: {}", instance.worktree_path);
         }
 
-        // Delete branch
-        if let Err(e) = git::delete_branch(&instance.branch) {
+        // Delete branch (run from repo root since worktree is gone)
+        if let Err(e) = git::delete_branch_in(&instance.branch, &repo_root) {
             eprintln!("  Warning: Failed to delete branch: {}", e);
         } else {
             println!("  Deleted branch: {}", instance.branch);
@@ -87,7 +90,7 @@ pub fn execute(task_ref: String) -> Result<()> {
     } else {
         // No instance saved, but there might be orphaned resources from a failed start
         // Try to clean up based on expected paths
-        let cleaned = cleanup_orphaned_resources(&name, &config)?;
+        let cleaned = cleanup_orphaned_resources(&name, &config, &repo_root)?;
 
         // If already pending and nothing to clean, just report
         if current_status == TaskStatus::Pending && !cleaned {
@@ -114,7 +117,7 @@ pub fn execute(task_ref: String) -> Result<()> {
 
 /// Clean up orphaned resources from a failed start (no instance saved)
 /// Returns true if any resources were cleaned up
-fn cleanup_orphaned_resources(task_name: &str, config: &WtConfig) -> Result<bool> {
+fn cleanup_orphaned_resources(task_name: &str, config: &WtConfig, repo_root: &str) -> Result<bool> {
     let cwd = env::current_dir().map_err(|e| WtError::Git(e.to_string()))?;
     let worktree_path = cwd
         .join(&config.worktree_dir)
@@ -140,9 +143,9 @@ fn cleanup_orphaned_resources(task_name: &str, config: &WtConfig) -> Result<bool
         }
     }
 
-    // Delete any matching branches
+    // Delete any matching branches (run from repo root since worktree may be gone)
     for branch in branches {
-        if let Err(e) = git::delete_branch(&branch) {
+        if let Err(e) = git::delete_branch_in(&branch, repo_root) {
             eprintln!("  Warning: Failed to delete branch {}: {}", branch, e);
         } else {
             println!("  Deleted branch: {}", branch);

@@ -125,13 +125,14 @@ fn get_rc_file(shell: &Shell) -> Result<PathBuf> {
 }
 
 fn get_eval_line(shell: &Shell) -> String {
+    // Use git-common-dir to find main repo (works from worktree), strip /.git suffix
     match shell {
         Shell::Zsh => r#"eval "$(command wt completions generate zsh)"
-wt() { if [[ "$1" == "new" ]]; then local p; p=$(command wt "$@" --print-path) && cd "$p"; else command wt "$@"; fi; }"#.to_string(),
+wt() { case "$1" in new) local p; p=$(command wt "$@" --print-path) && cd "$p";; archive|reset) local r; r=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); r=${r%/.git}; command wt "$@"; cd "$r" 2>/dev/null;;  *) command wt "$@";; esac; }"#.to_string(),
         Shell::Bash => r#"eval "$(command wt completions generate bash)"
-wt() { if [[ "$1" == "new" ]]; then local p; p=$(command wt "$@" --print-path) && cd "$p"; else command wt "$@"; fi; }"#.to_string(),
+wt() { case "$1" in new) local p; p=$(command wt "$@" --print-path) && cd "$p";; archive|reset) local r; r=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); r=${r%/.git}; command wt "$@"; cd "$r" 2>/dev/null;;  *) command wt "$@";; esac; }"#.to_string(),
         Shell::Fish => r#"command wt completions generate fish | source
-function wt; if test "$argv[1]" = "new"; set -l p (command wt $argv --print-path); and cd $p; else; command wt $argv; end; end"#.to_string(),
+function wt; switch $argv[1]; case new; set -l p (command wt $argv --print-path); and cd $p; case archive reset; set -l r (git rev-parse --path-format=absolute --git-common-dir 2>/dev/null | string replace -r '/.git$' ''); command wt $argv; cd $r 2>/dev/null; case '*'; command wt $argv; end; end"#.to_string(),
         _ => String::new(),
     }
 }

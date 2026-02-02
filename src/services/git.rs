@@ -51,8 +51,22 @@ pub fn remove_worktree(path: &str) -> Result<()> {
     CommandRunner::git().run(&["worktree", "remove", "--force", path])
 }
 
-pub fn delete_branch(branch: &str) -> Result<()> {
-    CommandRunner::git().run(&["branch", "-D", branch])
+pub fn delete_branch_in(branch: &str, cwd: &str) -> Result<()> {
+    CommandRunner::git()
+        .current_dir(cwd)
+        .run(&["branch", "-D", branch])
+}
+
+/// Get the main repository root path (works from worktree).
+pub fn get_repo_root() -> Result<String> {
+    let git_dir = CommandRunner::git()
+        .output(&["rev-parse", "--path-format=absolute", "--git-common-dir"])?;
+    let git_dir = git_dir.trim();
+    // Strip /.git suffix
+    Ok(git_dir
+        .strip_suffix("/.git")
+        .unwrap_or(git_dir)
+        .to_string())
 }
 
 pub fn branch_exists(branch: &str) -> bool {
