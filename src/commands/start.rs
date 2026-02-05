@@ -111,6 +111,9 @@ fn execute_single(name: String) -> Result<()> {
         return Err(WtError::BranchExists(branch));
     }
 
+    // Record base commit before creating worktree (for diff stats)
+    let base_commit = git::get_head_commit();
+
     git::create_worktree(&branch, &worktree_path)?;
 
     // Initialize workspace
@@ -159,6 +162,7 @@ fn execute_single(name: String) -> Result<()> {
             tmux_session: task_session.clone(),
             tmux_window: name.clone(), // Keep for backwards compat, not used for new sessions
             session_id: Some(session_id),
+            base_commit,
         }),
     );
     store.save_status()?;

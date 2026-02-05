@@ -76,6 +76,9 @@ pub struct Instance {
     pub tmux_window: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    /// Base commit when worktree was created (for diff stats)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_commit: Option<String>,
 }
 
 /// Frontmatter of task markdown file (definition only, no runtime state)

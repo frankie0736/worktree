@@ -186,6 +186,7 @@ mod tests {
             tmux_session: "wt".to_string(),
             tmux_window: "test".to_string(),
             session_id: None,
+            base_commit: None,
         };
         store.set_instance("test", Some(instance.clone()));
 

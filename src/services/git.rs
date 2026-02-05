@@ -16,14 +16,16 @@ pub struct GitMetrics {
 }
 
 /// Get git statistics for a worktree
-pub fn get_worktree_metrics(worktree_path: &str) -> Option<GitMetrics> {
+pub fn get_worktree_metrics(worktree_path: &str, base_commit: Option<&str>) -> Option<GitMetrics> {
     let path = Path::new(worktree_path);
     if !path.exists() {
         return None;
     }
 
-    let (additions, deletions) = get_diff_stats(worktree_path).unwrap_or((0, 0));
-    let commits = get_commit_count(worktree_path, "main")
+    let (additions, deletions) = get_diff_stats(worktree_path, base_commit).unwrap_or((0, 0));
+    let commits = base_commit
+        .and_then(|base| get_commit_count(worktree_path, base))
+        .or_else(|| get_commit_count(worktree_path, "main"))
         .or_else(|| get_commit_count(worktree_path, "master"))
         .unwrap_or(0);
     let has_conflict = has_conflicts(worktree_path);
@@ -73,6 +75,14 @@ pub fn branch_exists(branch: &str) -> bool {
     CommandRunner::git().success(&["show-ref", "--verify", "--quiet", &format!("refs/heads/{}", branch)])
 }
 
+/// Get current HEAD commit hash (short form)
+pub fn get_head_commit() -> Option<String> {
+    CommandRunner::git()
+        .output(&["rev-parse", "--short", "HEAD"])
+        .ok()
+        .map(|s| s.trim().to_string())
+}
+
 /// Find branches matching a pattern (e.g., "wt/task-*")
 pub fn find_branches(pattern: &str) -> Vec<String> {
     let output = CommandRunner::git().output(&["branch", "--list", pattern]);
@@ -86,13 +96,16 @@ pub fn find_branches(pattern: &str) -> Vec<String> {
     }
 }
 
-/// Get diff stats (additions, deletions) for a worktree compared to main branch.
+/// Get diff stats (additions, deletions) for a worktree compared to base commit.
 /// Shows all changes on the branch, including committed ones.
-pub fn get_diff_stats(worktree_path: &str) -> Option<(i32, i32)> {
-    // Try to find the base branch (main or master)
-    let base = get_default_branch(worktree_path).unwrap_or_else(|| "main".to_string());
+pub fn get_diff_stats(worktree_path: &str, base_commit: Option<&str>) -> Option<(i32, i32)> {
+    // Use provided base_commit, or fallback to main/master
+    let base = base_commit
+        .map(|s| s.to_string())
+        .or_else(|| get_default_branch(worktree_path))
+        .unwrap_or_else(|| "main".to_string());
 
-    // Try committed changes first (main...HEAD)
+    // Try committed changes first (base...HEAD)
     let output = CommandRunner::new("git")
         .current_dir(worktree_path)
         .output(&["diff", "--shortstat", &format!("{}...HEAD", base)]);

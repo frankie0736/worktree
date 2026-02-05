@@ -103,6 +103,7 @@ impl App {
             let task = store.get(task_name).unwrap();
             let instance = store.get_instance(task.name());
             let worktree_path = instance.map(|i| i.worktree_path.clone());
+            let base_commit = instance.and_then(|i| i.base_commit.clone());
 
             // Tmux status - check if session exists (each task has its own session)
             let tmux_alive = if let Some(inst) = instance {
@@ -127,7 +128,7 @@ impl App {
             // Git metrics (additions, deletions, commits, conflict)
             let git_metrics = worktree_path
                 .as_deref()
-                .and_then(git::get_worktree_metrics);
+                .and_then(|p| git::get_worktree_metrics(p, base_commit.as_deref()));
             let (additions, deletions) = git_metrics
                 .as_ref()
                 .map(|m| (m.additions, m.deletions))

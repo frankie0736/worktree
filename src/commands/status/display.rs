@@ -60,6 +60,7 @@ pub fn display_status(json: bool) -> Result<()> {
 
         let instance = store.get_instance(task_name);
         let worktree_path = instance.map(|i| i.worktree_path.as_str());
+        let base_commit = instance.and_then(|i| i.base_commit.as_deref());
 
         // Get session_id and transcript path info
         let session_id = instance.and_then(|i| i.session_id.clone());
@@ -85,7 +86,7 @@ pub fn display_status(json: bool) -> Result<()> {
         let current_tool = transcript_metrics.as_ref().and_then(|m| m.current_tool.clone());
 
         // Get git metrics (additions, deletions, commits, conflict)
-        let git_metrics = worktree_path.and_then(git::get_worktree_metrics);
+        let git_metrics = worktree_path.and_then(|p| git::get_worktree_metrics(p, base_commit));
 
         if let Some(ref m) = git_metrics {
             total_additions += m.additions;

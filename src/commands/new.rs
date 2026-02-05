@@ -48,6 +48,9 @@ pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
         .to_string_lossy()
         .to_string();
 
+    // Record base commit before creating worktree (for diff stats)
+    let base_commit = git::get_head_commit();
+
     // Create worktree and branch
     git::create_worktree(&branch, &worktree_path)?;
 
@@ -86,6 +89,7 @@ pub fn execute(name: Option<String>, print_path: bool) -> Result<()> {
             tmux_session: task_session.clone(),
             tmux_window: name.clone(), // Keep for backwards compat
             session_id: None, // No Claude session
+            base_commit,
         }),
     );
     store.save_status()?;
